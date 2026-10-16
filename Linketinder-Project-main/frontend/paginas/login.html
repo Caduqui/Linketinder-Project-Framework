@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body data-somente-deslogado>
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main id="tela-acesso">
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <section class="container">
+        <div class="cadastro_container">
+            <h3 data-tipo="candidato">Entrar como candidato</h3>
+            <h3 data-tipo="empresa">Entrar como empresa</h3>
+            <h3 data-tipo="recrutador">Entrar como recrutador</h3>
+
+            <form id="form-login">
+                <input type="email" id="login_email" placeholder="Email" autocomplete="email" required>
+                <input type="password" id="login_senha" placeholder="Senha" autocomplete="current-password" required>
+                <button type="submit">Entrar</button>
+            </form>
+
+            <p class="alternar-acesso" data-tipo="candidato,empresa">
+                Ainda não tem uma conta? <a data-pagina="cadastro.html" href="cadastro.html">Registre-se</a>
+            </p>
+            <p class="alternar-acesso" data-tipo="recrutador">
+                O cadastro de recrutadores é realizado pela empresa.
+            </p>
+            <p class="alternar-acesso">
+                <a href="../index.html">Voltar e escolher outro perfil</a>
+            </p>
+        </div>
+    </section>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+
+</body>
+</html>

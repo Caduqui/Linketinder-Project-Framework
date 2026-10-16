@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body data-perfil-exigido="empresa,recrutador">
+
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa,recrutador" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <div id="painel-candidatos-da-vaga" class="painel-fila">
+        <h2 id="titulo-vaga">Candidatos da vaga</h2>
+        <p id="resumo-vaga" class="saudacao"></p>
+
+        <section id="fila" class="fila">
+            <article id="card" class="card-destaque">
+                <div class="card-conteudo">
+                    <h3 id="card-titulo"></h3>
+                    <p id="card-afinidade" class="card-afinidade"></p>
+                    <dl id="card-detalhes" class="card-detalhes"></dl>
+                </div>
+            </article>
+
+            <p id="fila-vazia" class="fila-vazia" hidden></p>
+            <div id="card-acoes" class="card-acoes">
+
+                <!-- <a href="https://www.flaticon.com/br/icones-gratis/gostar" title="gostar ícones">Gostar ícones criados por NajmunNahar - Flaticon</a> -->
+                <button type="button" id="botao-curtir" class="botao-acao botao-curtir" title="Curtir" aria-label="Curtir">
+                    <img src="../assets/icon-curtir.png" alt="" class="icone-botao">
+                </button>
+
+                <!-- <a href="https://www.flaticon.com/br/icones-gratis/seta-direita" title="seta direita ícones">Seta direita ícones criados por BomSymbols - Flaticon</a> -->
+                <button type="button" id="botao-passar" class="botao-acao botao-passar" title="Passar" aria-label="Passar">
+                    <img src="../assets/icon-next.png" alt="" class="icone-botao">
+                </button>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+
+</body>
+</html>

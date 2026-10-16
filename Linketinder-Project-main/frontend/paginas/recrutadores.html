@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder - Recrutadores</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body data-perfil-exigido="empresa">
+<header class="cabecalho">
+    <h1>Recrutadores da empresa</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main class="painel-recrutadores">
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <section class="secao-recrutadores">
+        <h2>Cadastrar recrutador</h2>
+        <form id="form-recrutador">
+            <label for="recrutador_nome">Nome</label>
+            <input type="text" id="recrutador_nome" maxlength="50" required>
+
+            <label for="recrutador_area">Área</label>
+            <select id="recrutador_area" required>
+                <option value="" disabled selected>Selecione uma área</option>
+                <option value="TI">TI</option>
+                <option value="RH">RH</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Segurança da Informação">Segurança da Informação</option>
+                <option value="Vendas">Vendas</option>
+                <option value="Financeiro">Financeiro</option>
+                <option value="Outros">Outros</option>
+            </select>
+
+            <label for="recrutador_descricao">Descrição</label>
+            <textarea id="recrutador_descricao" maxlength="500" rows="3"></textarea>
+
+            <label for="recrutador_email">E-mail</label>
+            <input type="email" id="recrutador_email" maxlength="200" autocomplete="email" required>
+
+            <label for="recrutador_cpf">CPF</label>
+            <input type="text" id="recrutador_cpf" maxlength="15" required>
+
+            <label for="recrutador_dataNascimento">Data de nascimento</label>
+            <input type="date" id="recrutador_dataNascimento" required>
+
+            <label for="recrutador_senha">Senha</label>
+            <input type="password" id="recrutador_senha" minlength="6" maxlength="50" autocomplete="new-password" required>
+
+            <button type="submit">Cadastrar recrutador</button>
+        </form>
+    </section>
+
+    <section class="secao-recrutadores">
+        <h2>Contagem por área</h2>
+        <ul id="contagem-recrutadores-por-area" class="contagem-areas"></ul>
+    </section>
+
+    <section class="secao-recrutadores">
+        <h2>Recrutadores</h2>
+        <ul id="lista-recrutadores" class="lista-recrutadores">
+            <li class="card">Carregando recrutadores...</li>
+        </ul>
+    </section>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+</body>
+</html>

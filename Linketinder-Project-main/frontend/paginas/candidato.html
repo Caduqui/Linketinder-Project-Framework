@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+
+<body data-perfil-exigido="candidato">
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <div id="painel-candidato" class="painel-fila">
+        <h2>Vagas para você</h2>
+        <p id="saudacao-candidato" class="saudacao"></p>
+
+        <section id="fila" class="fila">
+            <article id="card" class="card-destaque">
+                <div class="card-conteudo">
+                    <h3 id="card-titulo"></h3>
+                    <p id="card-afinidade" class="card-afinidade"></p>
+                    <dl id="card-detalhes" class="card-detalhes"></dl>
+                </div>
+            </article>
+
+            <p id="fila-vazia" class="fila-vazia" hidden></p>
+
+            <div id="card-acoes" class="card-acoes">
+                <button type="button" id="botao-passar" class="botao-acao botao-passar" title="Passar" aria-label="Passar">&#10140;</button>
+                <button type="button" id="botao-curtir" class="botao-acao botao-curtir" title="Curtir" aria-label="Curtir">&#9829;</button>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+</body>
+</html>

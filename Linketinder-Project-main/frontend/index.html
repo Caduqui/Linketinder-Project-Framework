@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>LinkeTinder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-somente-deslogado>
+
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <section class="escolha-perfil">
+        <h3>Como você quer usar o Linketinder?</h3>
+
+        <div class="opcoes-perfil">
+            <a class="opcao-perfil" href="paginas/login.html?tipo=candidato">
+                <strong>Sou candidato</strong>
+                <span>Quero encontrar vagas que combinam comigo</span>
+            </a>
+            <a class="opcao-perfil" href="paginas/login.html?tipo=empresa">
+                <strong>Sou empresa</strong>
+                <span>Quero publicar vagas e encontrar talentos</span>
+            </a>
+            <a class="opcao-perfil" href="paginas/login.html?tipo=recrutador">
+                <strong>Sou recrutador</strong>
+                <span>Quero analisar candidatos nas vagas atribuídas a mim</span>
+            </a>
+        </div>
+    </section>
+</main>
+
+<script type="module" src="ts/main.ts"></script>
+</body>
+</html>

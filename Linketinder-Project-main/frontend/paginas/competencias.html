@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+
+<body data-perfil-exigido="candidato">
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <section class="container">
+        <div class="cadastro_container">
+            <h3>Suas competências</h3>
+            <form id="form-competencias">
+                <p>Marque as competências que você já possui:</p>
+                <div id="lista-competencias" class="lista-competencias"></div>
+
+                <p>Não encontrou? Digite outras (separadas por vírgula):</p>
+                <input type="text" id="competencias_novas" placeholder="Ex.: Groovy, Docker">
+
+                <button type="submit">Salvar e ver vagas</button>
+            </form>
+        </div>
+    </section>
+
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+
+</body>
+</html>

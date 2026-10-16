@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body data-perfil-exigido="empresa">
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <section class="container">
+
+        <div class="cadastro_container">
+            <h3>Cadastrar Nova Vaga</h3>
+            <p class="saudacao">A vaga será publicada em nome de <strong id="nome-empresa"></strong>.</p>
+
+            <form id="form-vaga">
+                <input type="text" id="vaga_nome" placeholder="Nome" maxlength="100" required>
+                <input type="text" id="vaga_descricao" placeholder="Descrição" maxlength="500" required>
+                <input type="text" id="vaga_estado" placeholder="Estado (UF)" minlength="2" maxlength="2" required>
+                <input type="text" id="vaga_cidade" placeholder="Cidade" maxlength="100" required>
+                <input type="text" id="vaga_competencias" placeholder="Competências (separadas por vírgula)" required>
+                <button type="submit">Cadastrar Vaga</button>
+            </form>
+        </div>
+    </section>
+
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+</body>
+</html>

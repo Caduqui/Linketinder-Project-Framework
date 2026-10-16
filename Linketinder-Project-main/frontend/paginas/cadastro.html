@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body data-somente-deslogado>
+
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main id="tela-acesso">
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <section class="container">
+        <div class="cadastro_container" data-tipo="candidato">
+            <h3>Cadastrar Novo Candidato</h3>
+            <form id="form-candidato">
+                <input type="text" id="candidato_nome" placeholder="Nome" maxlength="50" required>
+                <input type="text" id="candidato_sobrenome" placeholder="Sobrenome" maxlength="50" required>
+                <input type="date" id="candidato_dataNascimento" placeholder="Data de Nascimento" required>
+                <input type="email" id="candidato_email" placeholder="Email" maxlength="200" autocomplete="email" required>
+                <input type="text" id="candidato_cpf" placeholder="CPF" maxlength="15" required>
+                <input type="text" id="candidato_pais" placeholder="País" maxlength="100" required>
+                <input type="text" id="candidato_cep" placeholder="CEP" maxlength="15" required>
+                <input type="text" id="candidato_descricao" placeholder="Descrição" maxlength="500" required>
+                <input type="password" id="candidato_senha" placeholder="Senha" minlength="6" maxlength="50" autocomplete="new-password" required>
+                <input type="text" id="candidato_formacao" placeholder="Formação" maxlength="100" required>
+                <button type="submit">Cadastrar Candidato</button>
+            </form>
+        </div>
+
+        <div class="cadastro_container" data-tipo="empresa">
+            <h3>Cadastrar Nova Empresa</h3>
+            <form id="form-empresa">
+                <input type="text" id="empresa_nome" placeholder="Nome da Empresa" maxlength="100" required>
+                <input type="email" id="empresa_email" placeholder="Email" maxlength="200" autocomplete="email" required>
+                <input type="text" id="empresa_cnpj" placeholder="CNPJ" maxlength="30" required>
+                <input type="text" id="empresa_pais" placeholder="País" maxlength="100" required>
+                <input type="text" id="empresa_cep" placeholder="CEP" maxlength="15" required>
+                <input type="text" id="empresa_descricao" placeholder="Descrição da empresa" maxlength="500" required>
+                <input type="password" id="empresa_senha" placeholder="Senha" minlength="6" maxlength="50" autocomplete="new-password" required>
+                <button type="submit">Cadastrar Empresa</button>
+            </form>
+        </div>
+    </section>
+
+    <p class="alternar-acesso">
+        Já tem uma conta? <a data-pagina="login.html" href="login.html">Entrar</a>
+    </p>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Linketinder</title>
+    <link rel="stylesheet" href="../style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-perfil-exigido="empresa,recrutador">
+
+<header class="cabecalho">
+    <h1>Seja bem-vindo ao LinkeTinder</h1>
+    <nav>
+        <button id="buttonTelaCandidato" data-visivel-para="candidato" hidden>Vagas</button>
+        <button id="buttonTelaMinhasVagas" data-visivel-para="empresa,recrutador" hidden>Minhas vagas</button>
+        <button id="buttonTelaVaga" data-visivel-para="empresa" hidden>Cadastrar vagas</button>
+        <button id="buttonTelaRecrutadores" data-visivel-para="empresa" hidden>Recrutadores</button>
+        <button id="buttonSair" data-visivel-para="logado" hidden>Sair</button>
+    </nav>
+    <p id="usuario-logado" class="usuario-logado"></p>
+</header>
+
+<main>
+    <p id="mensagem" class="mensagem" role="alert"></p>
+
+    <div class="minhas-vagas">
+        <section class="coluna-vagas">
+            <h3>Minhas vagas</h3>
+            <ul id="lista-minhas-vagas"></ul>
+        </section>
+
+        <section class="coluna-grafico" data-visivel-para="empresa" hidden>
+            <h3>Competências dos Candidatos</h3>
+            <canvas id="chartCompetencias"></canvas>
+        </section>
+    </div>
+</main>
+
+<script type="module" src="../ts/main.ts"></script>
+
+</body>
+</html>
