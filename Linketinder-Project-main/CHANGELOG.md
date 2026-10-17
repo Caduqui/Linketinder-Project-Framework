@@ -17,6 +17,43 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Sincronização da documentação do microsserviço com o estado atual do código e do repositório, incluindo `AGENTS.md`, `docs/specs/microservico/spec.md` e `docs/specs/microservico/plano.md` (revisão de 2026-10-13).
 
 ### Adicionado
+- MS Curtidas em Micronaut (`microsservicos/ms-curtidas`, porta 8084) com
+  `POST /curtidas` nos três sentidos e criação do match pelo mesmo `INSERT ...
+  SELECT` da API antiga; a resposta traz só `match` e o serviço consulta vagas e
+  recrutadores direto no banco, sem chamar outro microsserviço
+  (spec `backend-micronaut`, tarefa 9).
+- MS Vagas em Micronaut (`microsservicos/ms-vagas`, porta 8083) com CRUD de vagas:
+  competências resolvidas sem diferenciar maiúsculas, `PUT` que troca as
+  competências sem mudar a empresa dona e `DELETE` que apaga competências,
+  curtidas, matches e atribuições da vaga numa transação
+  (spec `backend-micronaut`, tarefa 8).
+- `POST /login` no MS Usuários para candidato, empresa e recrutador, com `401`
+  genérico e resposta restrita a tipo, id, nome (e `idEmpresa` do recrutador);
+  a senha é comparada exatamente como enviada (spec `backend-micronaut`, tarefa 7).
+- Recrutadores e atribuição de vagas no MS Usuários, com o mesmo contrato da API
+  antiga e a nova atualização por `PUT /recrutadores/{id}`, que não troca a
+  empresa; as consultas não carregam CPF, data de nascimento nem senha
+  (spec `backend-micronaut`, tarefa 6).
+- CRUD de empresas no MS Usuários, com a mesma validação e o `409` do cadastro e
+  recusa da exclusão de empresa com vagas ou recrutadores
+  (spec `backend-micronaut`, tarefa 5).
+- MS Usuários em Micronaut (`microsservicos/ms-usuarios`, porta 8081) com CRUD
+  de candidatos: validação rígida do cadastro portada do `microservico-cadastro`,
+  `409` genérico em cadastro repetido, `PUT` sem mexer nas competências e
+  `DELETE` apagando competências, curtidas e matches numa transação
+  (spec `backend-micronaut`, tarefa 4).
+- `POST /competencias` no MS Competências: soma competências ao candidato numa
+  única transação, reaproveitando a já cadastrada em qualquer caixa, e mantém a
+  resposta `201` com o cadastro do candidato sem a senha
+  (spec `backend-micronaut`, tarefa 3).
+- CRUD do catálogo de competências no MS Competências (`GET /competencias`,
+  `POST /competencias/catalogo`, `PUT` e `DELETE /competencias/{id}`), com nome
+  repetido em qualquer caixa respondendo `409` e recusa de exclusão de
+  competência ligada a candidato ou vaga (spec `backend-micronaut`, tarefa 2).
+- Esqueleto do MS Competências em Micronaut (`microsservicos/ms-competencias`):
+  build próprio, erros no formato `{"erro"}`, CORS, log sem dados pessoais,
+  conexão por `DataSource` e senha do banco só por variável de ambiente
+  (spec `backend-micronaut`, tarefa 1).
 - Estrutura do recrutador no banco: tabelas `recrutadores`,
   `recrutador_vaga` e `curtida_recrutador_candidato`, mais a coluna
   `matches.id_recrutador` e carga fictícia para as atribuições e curtidas do
@@ -91,6 +128,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   com o frontend (spec `microservico`, tarefa 7).
 
 ### Modificado
+- `AGENTS.md` e `README.md` descrevem o backend em quatro microsserviços
+  Micronaut: stack, estrutura, como executar e testar, contrato, convenções e
+  pendências; a spec `backend-micronaut` fica marcada como implementada
+  (spec `backend-micronaut`, tarefa 12).
+- O frontend passa a chamar cada microsserviço pela própria URL base
+  (`ts/api/http.ts` com um cliente por MS, configurável por `VITE_URL_USUARIOS`,
+  `VITE_URL_COMPETENCIAS`, `VITE_URL_VAGAS` e `VITE_URL_CURTIDAS`; a
+  `VITE_API_URL` sai), e o `.gitignore` do frontend passa a ignorar `.env`
+  (spec `backend-micronaut`, tarefa 10).
 - Documentação da feature do recrutador no `AGENTS.md` e no `README.md`: domínio, estrutura,
   regras do recrutador, rotas com `DELETE`, a tabela do Princípio do Anonimato com os três
   perfis e as pendências de senha em texto puro e de integridade das rotas novas
@@ -112,6 +158,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (spec `microservico`, tarefa 8).
 
 ### Corrigido
+- Os quatro microsserviços passam a mandar `Vary: Origin` em toda resposta,
+  e não só quando a requisição traz `Origin` (spec `backend-micronaut`, revisão AP-01).
+- O MS Curtidas anuncia só `POST` no CORS, o único método que usa
+  (spec `backend-micronaut`, revisão AP-02).
+- Os testes do MS Usuários deixam de usar CPF com dígito verificador válido
+  (spec `backend-micronaut`, revisão AP-03).
+- Sai a infraestrutura copiada e não usada: tradutor de erro de banco no MS Vagas
+  e no MS Curtidas, e a transação no MS Curtidas (spec `backend-micronaut`, revisão AP-04).
 - Bloco do recrutador em `database/Linketinder.sql` ganha
   `ALTER TABLE matches ADD COLUMN IF NOT EXISTS id_recrutador`, para também poder ser
   aplicado em um banco que já tinha o script antigo carregado (spec `recrutador`, tarefa 15).
@@ -128,6 +182,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   reservado `example.com` (spec `microservico`, revisão AP-08).
 
 ### Removido
+- CLI, API de servlets, `microservico-cadastro/`, `lib/` e o build Gradle da
+  raiz (`build.gradle`, `settings.gradle`, `gradlew*`, `gradle/`), substituídos
+  pelos quatro microsserviços; o `.gitignore` do projeto passa a ignorar `.env`
+  (spec `backend-micronaut`, tarefa 11).
 - `frontend/paginas/recrutador.html`, página provisória da tarefa 12, substituída pela
   `minhasVagas.html`, que atende empresa e recrutador (spec `recrutador`, tarefa 15).
 - `frontend/ts/dados.ts` e a gravação de cadastros e senhas no `localStorage` do
