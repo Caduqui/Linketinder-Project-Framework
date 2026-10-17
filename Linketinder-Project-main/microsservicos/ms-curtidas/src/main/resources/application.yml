@@ -1,0 +1,19 @@
+micronaut:
+  application:
+    name: ms-curtidas
+  server:
+    port: 8084
+    cors:
+      enabled: true
+      configurations:
+        frontend:
+          allowed-origins:
+            - ${LINKETINDER_FRONTEND_ORIGEM:`http://localhost:5173`}
+          allowed-methods:
+            - POST
+datasources:
+  default:
+    url: ${LINKETINDER_BANCO_URL:`jdbc:postgresql://localhost:5432/linketinder`}
+    username: ${LINKETINDER_BANCO_USUARIO:postgres}
+    password: ${LINKETINDER_BANCO_SENHA}
+    driver-class-name: org.postgresql.Driver

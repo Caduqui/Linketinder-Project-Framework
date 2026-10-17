@@ -1,0 +1,11 @@
+micronaut:
+  server:
+    port: -1
+    cors:
+      configurations:
+        frontend:
+          allowed-origins:
+            - http://localhost:5173
+datasources:
+  default:
+    enabled: false
