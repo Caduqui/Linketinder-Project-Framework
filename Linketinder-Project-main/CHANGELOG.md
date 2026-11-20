@@ -7,6 +7,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Não lançado]
 
 ### Documentado
+- Desafio Spring no `AGENTS.md` e no `README.md`: os dois MS, os bancos, a
+  comunicação por HTTP entre eles, como subir, as rotas novas e o modo spring do
+  frontend. A feature entrou sem spec em `docs/specs/`.
 - Prompts da feature do recrutador no `PROMPTS.md` (etapas 9 a 15), reconstruídos
   a partir da spec, do plano, do `revisao.md` e dos commits, porque a sessão
   original do agente se perdeu; o arquivo passou a separar as duas features.
@@ -17,6 +20,25 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Sincronização da documentação do microsserviço com o estado atual do código e do repositório, incluindo `AGENTS.md`, `docs/specs/microservico/spec.md` e `docs/specs/microservico/plano.md` (revisão de 2026-10-13).
 
 ### Adicionado
+- Banco isolado do MS Competências Spring (`database/LinketinderCompetencias.sql`):
+  competências com nome único sem diferenciar maiúsculas e ligações com
+  candidatos e vagas guardando só o id, com a mesma carga inicial do banco
+  principal (desafio Spring).
+- MS Núcleo em Spring Boot 4.1.3 (`microsservicos-spring/nucleo`, porta 8086)
+  com Spring Data JPA e Hibernate no banco `linketinder`: candidatos, empresas,
+  vagas, recrutadores, login, curtidas e match com o contrato dos MS Micronaut.
+  As competências da vaga e do candidato são gravadas e lidas pelo MS
+  Competências por HTTP, e a vaga não é gravada se ele recusar ou estiver fora do
+  ar (`503`). `HEAD /candidatos/{id}` responde se o candidato existe (desafio
+  Spring).
+- MS Competências em Spring Boot 4.1.3 (`microsservicos-spring/competencias`,
+  porta 8087) no banco `linketinder_competencias`: CRUD de competências,
+  competências do candidato com nível, que só aceita candidato existente no MS
+  Núcleo, e as rotas que o Núcleo usa para substituir, ler em lote e apagar as
+  competências de vagas e candidatos (desafio Spring).
+- Modo spring do frontend (`npm run dev:spring`), que aponta o site para os MS
+  Spring (`VITE_SPRING_NUCLEO_URL`, `VITE_SPRING_COMPETENCIAS_URL`) sem mudar o
+  modo padrão, que continua no Micronaut (desafio Spring).
 - MS Curtidas em Micronaut (`microsservicos/ms-curtidas`, porta 8084) com
   `POST /curtidas` nos três sentidos e criação do match pelo mesmo `INSERT ...
   SELECT` da API antiga; a resposta traz só `match` e o serviço consulta vagas e
@@ -128,6 +150,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   com o frontend (spec `microservico`, tarefa 7).
 
 ### Modificado
+- Mensagem de serviço fora do ar no frontend passa a nomear o serviço inteiro
+  ("Não foi possível conectar ao serviço de usuários" ou "ao serviço núcleo",
+  conforme o modo) (desafio Spring).
+- Construtor do `RecrutadorService` do MS Usuários escrito em uma linha só, sem
+  mudança de comportamento.
 - `AGENTS.md` e `README.md` descrevem o backend em quatro microsserviços
   Micronaut: stack, estrutura, como executar e testar, contrato, convenções e
   pendências; a spec `backend-micronaut` fica marcada como implementada
