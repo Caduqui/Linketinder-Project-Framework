@@ -6,13 +6,15 @@ Guia para agentes de IA que trabalham neste repositório. Leia inteiro antes de 
 
 Sempre que houver dúvida, ambiguidade ou uma decisão que não esteja escrita aqui (regra de negócio, mudança de schema, nova dependência, contrato da API, o que fazer com uma pendência listada abaixo), **pare e pergunte ao autor antes de decidir sozinho**. Explique o que encontrou e quais são as opções. Não "resolva" silenciosamente uma inconsistência entre este documento e o código.
 
-## Status atual do repositório (2026-10-17)
+## Status atual do repositório (2026-11-20)
 
-O backend foi reescrito com o **Micronaut Framework** na feature `backend-micronaut` (spec, plano e revisão em `docs/specs/backend-micronaut/`). Ele é formado por **quatro microsserviços** independentes em `microsservicos/`, como na figura do desafio (`assets/img.png`). O CLI, a API de servlets no Tomcat e o antigo `microservico-cadastro/` foram removidos, junto com o build Gradle da raiz e a pasta `lib/`.
+O backend foi reescrito com o **Micronaut Framework** na feature `backend-micronaut` (spec, plano e revisão em `docs/specs/backend-micronaut/`). Ele é formado por **quatro microsserviços** independentes em `microsservicos/`. O CLI, a API de servlets no Tomcat e o antigo `microservico-cadastro/` foram removidos, junto com o build Gradle da raiz e a pasta `lib/`.
 
 O frontend continua em TypeScript + Vite, sem framework; da feature `backend-micronaut` em diante, só a camada `ts/api/` mudou, para chamar cada microsserviço pela própria URL.
 
 As features anteriores (microsserviço de cadastro e recrutador) têm spec, plano e revisão em `docs/specs/microservico/` e `docs/specs/recrutador/`, que ficam como histórico: os caminhos e as classes citados nelas não existem mais. As regras de negócio delas continuam valendo e foram portadas para os microsserviços.
+
+Depois veio o **desafio Spring**, **sem spec**, no branch `feature/spring`: dois microsserviços Spring Boot em `microsservicos-spring/`, o **Núcleo** (candidato, empresa, vaga, recrutador, login, curtidas e match, porta 8086, banco `linketinder`) e o **Competências** (porta 8087, banco isolado `linketinder_competencias`, criado por `database/LinketinderCompetencias.sql`), com JPA e Hibernate e **chamadas HTTP entre os dois**. É um desafio separado do Micronaut: o site usa os MS Spring só no modo `npm run dev:spring` e continua no Micronaut com `npm run dev`. O desafio foi escrito sobre outra versão do MS Competências, e as rotas de competências ainda não batem com o frontend deste repositório (ver [Microsserviços Spring](#microsserviços-spring-desafio-spring)).
 
 Qualquer mudança nova deve ser refletida aqui, na spec da feature (quando houver) e no `CHANGELOG.md` antes de fechar a tarefa.
 
@@ -20,7 +22,7 @@ Qualquer mudança nova deve ser refletida aqui, na spec da feature (quando houve
 
 Linketinder é um projeto de LinkedIn com Tinder em que **candidatos curtem vagas**, **empresas curtem candidatos** e, quando a curtida é recíproca, acontece um **match**. Até o match, as partes não sabem quem está do outro lado (ver [Princípio do Anonimato](#princípio-do-anonimato-restrição-obrigatória)).
 
-O repositório tem duas partes: o backend, em quatro microsserviços (MS), e o frontend.
+O repositório tem três partes: o backend, em quatro microsserviços (MS) Micronaut, o desafio Spring, em dois MS Spring Boot, e o frontend.
 
 | Parte | O que é | Porta |
 |---|---|---|
@@ -28,10 +30,13 @@ O repositório tem duas partes: o backend, em quatro microsserviços (MS), e o f
 | MS Competências (`microsservicos/ms-competencias`) | Catálogo de competências e competências do candidato | `8082` |
 | MS Vagas (`microsservicos/ms-vagas`) | CRUD de vagas, com as competências de cada vaga | `8083` |
 | MS Curtidas (`microsservicos/ms-curtidas`) | Curtidas nos três sentidos e criação do match | `8084` |
-| Frontend (`frontend/`) | Páginas estáticas em TypeScript que chamam os MS com `fetch` | `5173` (Vite) |
+| MS Núcleo Spring (`microsservicos-spring/nucleo`) | Desafio Spring: candidato, empresa, vaga, recrutador, login, curtidas e match, no banco `linketinder` | `8086` |
+| MS Competências Spring (`microsservicos-spring/competencias`) | Desafio Spring: competências do candidato e da vaga, no banco `linketinder_competencias` | `8087` |
+| Frontend (`frontend/`) | Páginas estáticas em TypeScript que chamam os MS Micronaut com `fetch` (ou os Spring, no modo `spring`) | `5173` (Vite) |
 
 - Cada MS é uma aplicação à parte: build Gradle, wrapper, `.gitignore` e código próprios (pacote `org.linketinder.<ms>`), aberta em uma janela própria do IntelliJ. **Nenhum MS importa código de outro**: o que é comum (formato de erro, CORS, log, conexão) é repetido em cada um.
-- Os quatro gravam no **mesmo PostgreSQL** e **nenhum chama outro por HTTP**. Quando um MS precisa de dado de outro agregado (o MS Curtidas saber de quem é a vaga, o MS Vagas saber se a empresa existe), ele consulta direto no banco.
+- Os quatro Micronaut gravam no **mesmo PostgreSQL** e **nenhum chama outro por HTTP**. Quando um MS precisa de dado de outro agregado (o MS Curtidas saber de quem é a vaga, o MS Vagas saber se a empresa existe), ele consulta direto no banco.
+- Os dois MS Spring são a exceção: o Competências tem banco próprio e os dois **conversam por HTTP** (pacotes `org.linketinder.spring.nucleo` e `org.linketinder.spring.competencias`, sem importar código de outro MS).
 - O frontend é o único cliente. Ele não guarda dados próprios: o `sessionStorage` guarda apenas quem está logado (`tipo`, `id`, `nome` e, para o recrutador, `idEmpresa`).
 - Curtida e match existem só no MS Curtidas e no banco. Não há rota nem tela que liste matches.
 
@@ -41,6 +46,7 @@ O repositório tem duas partes: o backend, em quatro microsserviços (MS), e o f
 - **JVM do Gradle:** o plugin do Micronaut 5 exige que o **próprio Gradle** rode no JDK 25. Cada MS tem `gradle/gradle-daemon-jvm.properties` com `toolchainVersion=25`, então pelo terminal o Gradle acha o JDK 25 instalado sozinho. No IntelliJ, a *Gradle JVM* de cada janela precisa apontar para um JDK 25.
 - **Dependências de cada MS:** `micronaut-serde-jackson` (JSON), `micronaut-jdbc-hikari` (`DataSource`), `org.postgresql:postgresql:42.7.7`, `groovy`, `logback-classic`, `snakeyaml`; em teste, `micronaut-http-client` e `micronaut-test-spock` (pelo `testRuntime 'spock2'`).
 - **Banco:** PostgreSQL via JDBC puro sobre o `DataSource` injetado, sem ORM, sem Micronaut Data e sem ferramenta de migração.
+- **Microsserviços Spring:** Spring Boot 4.1.3 (plugin `org.springframework.boot` e o BOM do Boot), que fixa Groovy 5.0.8, Spring Framework 7, Hibernate 7.4, Jackson 3 e Tomcat 11 embutido (`jakarta.*`); `spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa` (Spring Data JPA com Hibernate e o pool Hikari), o mesmo driver PostgreSQL 42.7.7; `RestClient` do Spring para um MS chamar o outro. Nos testes, `spring-test` (MockMvc e `MockRestServiceServer`) e `groovy-json`, sem `spock-spring`. O Groovy compila com `parameters = true`.
 - **Testes:** Spock 2.4 (`groovy-5.0`) com `@MicronautTest`, em JUnit Platform.
 - **Frontend:** TypeScript ~6.0 + Vite 8, HTML/CSS sem framework, `fetch` para falar com os MS. Chart.js 4.5 está no `package.json`, mas o gráfico usa a cópia carregada por CDN em `paginas/minhasVagas.html` (`declare const Chart` em `graficoCompetencias.ts`).
 
@@ -48,7 +54,7 @@ O repositório tem duas partes: o backend, em quatro microsserviços (MS), e o f
 
 ```
 database/Linketinder.sql                  schema + carga inicial + consultas de exemplo
-assets/der.png, assets/img.png            diagrama entidade-relacionamento e figura do desafio
+database/LinketinderCompetencias.sql      banco isolado do MS Competências Spring + carga inicial
 microsservicos/
   ms-usuarios/ (8081)  ms-competencias/ (8082)  ms-vagas/ (8083)  ms-curtidas/ (8084)
     cada um com:
@@ -68,6 +74,19 @@ microsservicos/
       src/main/resources/application.yml, logback.xml
       src/test/groovy/org/linketinder/<ms>/   specs Spock; DadosFicticios concentra os dados de teste
       src/test/resources/application-test.yml datasource desligado e porta aleatória
+microsservicos-spring/                    desafio Spring: duas aplicações Spring Boot independentes (build, wrapper e .gitignore próprios)
+  nucleo/ (8086)  competencias/ (8087)
+    src/main/groovy/org/linketinder/spring/<ms>/
+      Aplicacao.groovy  sobe o Spring Boot (@SpringBootApplication)
+      controller/       só HTTP (@RestController); Representacao monta os mapas JSON de resposta
+      service/          regras (@Service, @Transactional), validadores, CamposDoCorpo e exceções de regra
+      repositorio/      interfaces do Spring Data JPA, com as consultas em @Query
+      model/            entidades JPA (@Entity) e modelos sem tabela
+      integracao/       interface do outro MS, cliente HTTP (RestClient) e a configuração dele
+      http/             TratadorDeErros (@RestControllerAdvice), FiltroDeRegistro, ConfiguracaoCors e RegistroDoServidor
+    src/main/resources/application.yml   porta, banco, URL do outro MS, CORS e níveis de log
+    src/test/groovy/org/linketinder/spring/<ms>/   specs Spock; ClienteDeTeste (MockMvc) e AplicacaoSpec (contexto sem banco)
+    src/test/resources/application-test.yml  sobe o contexto sem abrir conexão com o banco
 docs/specs/<feature>/                     spec.md, plano.md e revisao.md de cada feature
 skills/                                   skills do fluxo: feature-com-spec e revisao-com-spec
 CHANGELOG.md                              mudanças por tarefa, no formato Keep a Changelog
@@ -87,12 +106,12 @@ frontend/
     filaDeCards.ts   fila de um card por vez, com curtir e passar
     afinidade.ts     índice de afinidade e ordenação por afinidade
     graficoCompetencias.ts  gráfico de competências dos candidatos (Chart.js)
-    api/             http.ts (fetch, URL base de cada MS e ErroApi) e api.ts (uma função por endpoint)
+    api/             http.ts (fetch, URL base de cada MS, o modo spring e ErroApi) e api.ts (uma função por endpoint)
     telas/           telaAcesso, telaCandidato, telaCompetencia, telaMinhasVagas,
                      telaCandidatosDaVaga, telaVaga, telaRecrutadores
 ```
 
-Fluxo das camadas em cada MS: `http` (controller) → `service` → `repositorio` (interface) ← `dao` → `banco`.
+Fluxo das camadas em cada MS: `http` (controller) → `service` → `repositorio` (interface) ← `dao` → `banco`. Nos MS Spring: `controller` → `service` → `repositorio` (Spring Data JPA, sem `dao`) e `service` → `integracao` → outro MS.
 
 ## Domínio
 
@@ -112,6 +131,7 @@ Detalhes que costumam confundir:
 - Cada MS tem os próprios modelos, só com o que usa. O `Candidato` existe no MS Usuários e no MS Competências; a `Vaga`, no MS Vagas e no MS Usuários (para as vagas atribuídas ao recrutador). Não há modelo compartilhado.
 - Em `Candidato` e `Vaga` as competências são `List<String>` com os **nomes**. A resolução para `competencias` ignora maiúsculas: `java` reaproveita a `Java` já cadastrada (a mais antiga, se houver duas), e a que não existe é criada.
 - No frontend o tipo `Vaga` recebe `empresa: {id, nome}`, como o MS Vagas devolve, e só o cadastro (`NovaVaga`) envia `idEmpresa`.
+- No desafio Spring, `competencias`, `candidato_competencia` (com `nivel`) e `vaga_competencia` existem também no banco `linketinder_competencias`, com nome de competência único sem diferenciar maiúsculas e as ligações sem FK para candidato e vaga. São dados separados das tabelas homônimas do `linketinder`: o que um modo grava o outro não vê.
 
 ## Regras de negócio centrais
 
@@ -181,11 +201,22 @@ Detalhes que costumam confundir:
 - **Não há sessão no servidor:** nem token, nem cookie. Os MS não sabem quem está chamando e nenhuma rota exige login. Quem está logado é só o que o frontend guarda no `sessionStorage` (`sessao.ts`) e reenvia como `idCandidato`/`idEmpresa`/`idRecrutador`; qualquer cliente pode enviar outro `id`.
 - No frontend, cada página declara no `<body>` quem pode vê-la (`data-perfil-exigido`, que aceita uma lista como `"empresa,recrutador"`, ou `data-somente-deslogado`) e `navegacao.ts` redireciona quem não se encaixa. É conveniência de navegação, não segurança.
 
+### Microsserviços Spring (desafio Spring)
+
+Desafio separado do Micronaut, sem spec; o contrato está no `README.md` ("Backend em microsserviços com Spring"). Decisões do autor: só a empresa cria vagas (o "recrutador" do caso de uso é a pessoa que opera a conta da empresa); o Núcleo tem tudo que o site usa; o formulário do candidato mantém CEP e formação; o Núcleo usa o banco `linketinder` e o Competências um banco próprio.
+
+- **Contrato dos MS Micronaut:** o Núcleo responde as rotas de Usuários, Vagas e Curtidas, e o Competências as de Competências, com os mesmos validadores, mensagens e códigos de status.
+- **Pendência de contrato:** o desafio foi escrito sobre outra versão do MS Competências, com nível da competência do candidato e as rotas `POST`/`GET /candidatos/{id}/competencias` e `POST /competencias` cadastrando no catálogo. O MS Competências Micronaut deste repositório usa `POST /competencias` com `idCandidato` e `POST /competencias/catalogo`, sem nível, e é esse contrato que o `api.ts` chama. No modo `spring`, as telas de competências ainda não funcionam até as rotas serem alinhadas — pergunte ao autor qual lado ajustar.
+- **Competências em outro banco:** as competências da vaga e do candidato ficam no `linketinder_competencias`. O Núcleo grava a vaga e, na mesma transação, chama `PUT /vagas/{id}/competencias` no Competências; se ele recusar (`400`, repassado com a mensagem dele) ou estiver fora do ar (`503`), a vaga não é gravada. As listagens de vagas e de candidatos pedem as competências em lote (`GET /vagas/competencias?ids=` e `GET /candidatos/competencias?ids=`), e excluir vaga ou candidato apaga as competências dele no Competências.
+- **Candidato existente:** `POST` e `GET /candidatos/{id}/competencias` no Competências perguntam ao Núcleo por `HEAD /candidatos/{id}` (`200` ou `404`); Núcleo fora do ar é `503`.
+- **Tabelas antigas:** ao excluir candidato ou vaga, o Núcleo também apaga as linhas de `candidato_competencia` e `vaga_competencia` do `linketinder` gravadas pelos MS Micronaut, porque as FKs impediriam a exclusão.
+- **Erros:** os mesmos dos MS Micronaut, mais `503` com `{"erro": ...}` quando o outro MS não responde.
+
 ### Outras regras
 
 - Índice de afinidade (só no frontend, `calcularAfinidade` em `ts/afinidade.ts`): competências em comum ÷ total de competências da vaga, em porcentagem arredondada, ignorando maiúsculas/minúsculas e espaços das pontas; vaga sem competências dá 0%.
 - As filas de cards vêm em ordem decrescente de afinidade, com empate desfeito por sorteio (`ordenarPorAfinidade` embaralha antes de ordenar). Na fila de candidatos de uma vaga, quem tem 0% de afinidade não aparece; na fila de vagas do candidato, todas as vagas aparecem.
-- Com um MS fora do ar, só as telas que dependem dele mostram "Não foi possível conectar ao servidor".
+- Com um MS fora do ar, só as telas que dependem dele mostram "Não foi possível conectar ao serviço de ..." (no modo `spring`, "ao serviço núcleo" ou "ao serviço de competências").
 
 ## Princípio do Anonimato (restrição obrigatória)
 
@@ -224,6 +255,7 @@ Replicadas da API antiga na feature `backend-micronaut`, por decisão do autor, 
 - **`PUT` e `DELETE` sem autenticação:** os `PUT` e `DELETE` de candidato, empresa, vaga, competência e recrutador também ficam abertos — ampliação autorizada pelo autor na spec `backend-micronaut`. Quem souber um `id` altera ou exclui o registro. Não expõem dado novo (as respostas são as mesmas dos `GET`), mas o risco de integridade aumentou.
 - **Rotas de recrutador sem autenticação:** aceitam qualquer `idEmpresa` e `idRecrutador`. Quem souber o `id` de uma empresa cadastra, altera e remove recrutadores dela e lê nome, área, descrição e e-mail deles. A spec do recrutador (seção 4.3) autorizou e deixou a autenticação para feature própria.
 - **Senha em texto puro:** candidato, empresa e recrutador gravam a senha sem hash na coluna `senha`, e o `POST /login` compara em texto puro. Ela nunca é devolvida nem registrada em log, mas está legível no banco e trafega assim no corpo da requisição (HTTP, sem TLS, em desenvolvimento). Corrigir exige alterar as colunas, os cadastros e o login.
+- **Microsserviços Spring sem autenticação:** os dois MS Spring repetem as pendências acima (leituras abertas, CRUD, curtidas, recrutadores e senha em texto puro), e as rotas que só o Núcleo deveria chamar no MS Competências (`PUT`/`DELETE /vagas/{id}/competencias`, `DELETE /candidatos/{id}/competencias` e as leituras em lote) aceitam qualquer cliente. Quem souber um `id` troca ou apaga as competências de uma vaga ou de um candidato; o `HEAD /candidatos/{id}` do Núcleo revela só se um `id` existe. O Competências devolve do candidato e da vaga só o `id`, e os loggers do Spring e do Hibernate que escreveriam o caminho digitado ou o detalhe de uma violação de unicidade ficam desligados no `application.yml`.
 
 Resolvidas pela remoção do backend antigo: o CLI imprimindo o nome da empresa na lista de vagas antes do match, o `Match.descrever()` incompleto e o `microservico-cadastro` sem login.
 
@@ -241,7 +273,8 @@ Resolvidas pela remoção do backend antigo: o CLI imprimindo o nome da empresa 
   Sem `psql` no PATH, abra o arquivo no pgAdmin ou no console SQL do IntelliJ e execute.
 - **Problema conhecido no script:** o último `SELECT` antes do bloco `-- curtidas` está sem `;`. Executado de uma vez, o `CREATE TABLE "curtida_candidato_vaga"` falha junto com ele e tudo que depende dessa tabela também. Até ser corrigido, execute o bloco de curtidas/matches separadamente. Pergunte antes de corrigir o arquivo.
 - **SQL específico do PostgreSQL:** os DAOs usam `RETURNING` e `ON CONFLICT`. Só o PostgreSQL é suportado.
-- **Mudanças de schema:** não há migrações. Qualquer alteração precisa ser refletida em `database/Linketinder.sql`, nos DAOs de todos os MS que usam a tabela e no DER — **pergunte antes de alterar o schema**.
+- **Banco do MS Competências Spring:** `database/LinketinderCompetencias.sql` cria `competencias` (índice único em `LOWER(nome)`), `candidato_competencia` e `vaga_competencia` (sem FK para candidato e vaga) num banco à parte, com a mesma carga inicial de competências do `linketinder`. Também não é idempotente: `createdb -U postgres linketinder_competencias` e `psql -U postgres -d linketinder_competencias -f database/LinketinderCompetencias.sql`, uma vez. Os MS Spring usam a mesma `LINKETINDER_BANCO_SENHA` e conferem o schema na subida (`ddl-auto: validate`), sem criá-lo.
+- **Mudanças de schema:** não há migrações. Qualquer alteração precisa ser refletida no script do banco (`database/Linketinder.sql` ou `database/LinketinderCompetencias.sql`), nos DAOs ou nas entidades JPA de todos os MS que usam a tabela e no DER — **pergunte antes de alterar o schema**.
 
 ## Como executar
 
@@ -259,14 +292,25 @@ Cada MS roda a partir da própria pasta; no Windows use `gradlew.bat` (ou `./gra
   ```
 
   Portas padrão: MS Usuários `8081`, MS Competências `8082`, MS Vagas `8083`, MS Curtidas `8084`; troque com `MICRONAUT_SERVER_PORT`. A origem liberada no CORS vem de `LINKETINDER_FRONTEND_ORIGEM` (padrão `http://localhost:5173`). Rotas e exemplos estão no `README.md`.
-- **Frontend:** exige os MS no ar; sem um deles, as telas que dependem dele mostram "Não foi possível conectar ao servidor". As URLs base têm padrão nas portas `8081` a `8084` e podem ser trocadas por `VITE_URL_USUARIOS`, `VITE_URL_COMPETENCIAS`, `VITE_URL_VAGAS` e `VITE_URL_CURTIDAS`, em um `frontend/.env` que **não** vai para o repositório.
+- **Microsserviços Spring:** exigem o PostgreSQL no ar com os bancos `linketinder` e `linketinder_competencias` e a variável `LINKETINDER_BANCO_SENHA`. Abra cada pasta de `microsservicos-spring/` numa janela do IntelliJ e rode a classe `Aplicacao` do pacote, ou, pelo terminal, a partir de cada pasta:
+
+  ```bash
+  LINKETINDER_BANCO_SENHA=<sua-senha> ./gradlew bootRun                        # Git Bash
+  $env:LINKETINDER_BANCO_SENHA = "<sua-senha>"; .\gradlew.bat bootRun          # PowerShell
+  ```
+
+  Portas 8086 (Núcleo) e 8087 (Competências), trocáveis por `LINKETINDER_SPRING_NUCLEO_PORTA` e `LINKETINDER_SPRING_COMPETENCIAS_PORTA`; o endereço de um MS para o outro por `LINKETINDER_SPRING_NUCLEO_URL` e `LINKETINDER_SPRING_COMPETENCIAS_URL`; o banco do Competências por `LINKETINDER_COMPETENCIAS_BANCO_URL`; o CORS como nos Micronaut.
+- **Frontend:** exige os MS no ar; sem um deles, as telas que dependem dele mostram "Não foi possível conectar ao serviço de ...". As URLs base têm padrão nas portas `8081` a `8084` e podem ser trocadas por `VITE_URL_USUARIOS`, `VITE_URL_COMPETENCIAS`, `VITE_URL_VAGAS` e `VITE_URL_CURTIDAS`, em um `frontend/.env` que **não** vai para o repositório.
 
   ```bash
   cd frontend
   npm install
   npm run dev        # servidor Vite em http://localhost:5173
+  npm run dev:spring # o mesmo, falando com os MS Spring
   npx tsc --noEmit   # checagem de tipos
   ```
+
+  No modo `spring` (`import.meta.env.MODE`), o `http.ts` manda usuários, vagas e curtidas para o Núcleo (`VITE_SPRING_NUCLEO_URL`, padrão `http://localhost:8086`) e competências para o MS Competências Spring (`VITE_SPRING_COMPETENCIAS_URL`, padrão `http://localhost:8087`).
 
   O fluxo começa em `index.html` (escolher candidato, empresa ou recrutador) e a sessão fica no `sessionStorage`: fechar a aba desloga.
 
@@ -284,6 +328,7 @@ cd microsservicos/ms-usuarios
 - **Mocks só de interfaces:** o byte-buddy usado hoje não gera classes para o JDK 25, então os testes simulam só interfaces. Por isso `RegistroDoServidor` é interface, com a implementação `RegistroDoServidorEmLog`.
 - Os dados de teste vêm de `DadosFicticios` de cada MS: e-mails em `example.com` e documentos com dígito verificador inválido.
 - Os DAOs e a transação dependem de conferência manual contra o PostgreSQL real (`curl` e consulta ao banco).
+- Cada MS Spring tem a própria suíte, que roda sem banco: `cd microsservicos-spring/nucleo` (ou `competencias`) e `./gradlew test`. Os services usam `Mock` dos repositórios do Spring Data e da interface do outro MS (`integracao/`); os controllers são chamados pelo MockMvc (`ClienteDeTeste`), com o `TratadorDeErros` da aplicação; os clientes HTTP são testados com o `MockRestServiceServer`. O `AplicacaoSpec` sobe a aplicação inteira no perfil `test`, com o Hibernate impedido de abrir conexão: mapeamento JPA ou consulta JPQL errada derruba o contexto. O SQL nativo (`ON CONFLICT` e o match) depende de conferência manual com o PostgreSQL.
 - O frontend não tem testes unitários e não precisa ter (dispensado pelo desafio); valide com `npx tsc --noEmit` e manualmente no navegador.
 - Toda mudança de comportamento no backend deve vir com spec nova ou ajustada, e a suíte deve passar antes de considerar a tarefa concluída.
 
@@ -297,7 +342,8 @@ cd microsservicos/ms-usuarios
   - `repositorio`: interfaces; `dao`: só persiste e implementa uma interface de `repositorio`;
   - `banco`: `ConexaoBanco` abre conexões pelo `DataSource` injetado; `TransacaoJdbc` faz a transação por thread.
 - **Micronaut:** beans com `@Singleton`, dependências por construtor apontando para interfaces; controllers com `@ExecuteOn(TaskExecutors.BLOCKING)`, porque o JDBC bloqueia e não pode rodar no event loop do Netty. Exceção nova de regra ganha um `Tratador*` em `http/`.
-- **Microsserviços independentes:** nenhum MS importa código de outro nem chama outro por HTTP. O que é comum é repetido em cada um; ao mudar algo repetido, mude nos quatro.
+- **Microsserviços independentes:** nenhum MS importa código de outro nem chama outro por HTTP (exceto os dois MS Spring, que conversam por HTTP). O que é comum é repetido em cada um; ao mudar algo repetido, mude nos quatro.
+- **Microsserviços Spring:** as convenções dos Micronaut, com estas trocas: `@RestController` com `@RequestBody Map<String, Object> corpo` e `@PathVariable("id") Integer`; regras em beans `@Service`, com `@Transactional` nas operações com mais de uma escrita (no lugar de `Transacao`); persistência por interfaces do Spring Data JPA em `repositorio/`, com nomes em português e a consulta explícita em `@Query` (JPQL; SQL nativo só para `ON CONFLICT` e o match), sem pasta `dao`; o outro MS é acessado por uma interface em `integracao/`, implementada com `RestClient`, que transforma recusa (`400`) em `DadosInvalidosException` e qualquer outra falha em `ServicoIndisponivelException` (`503`). Erros traduzidos em `http/TratadorDeErros` (`@RestControllerAdvice`). Javadoc das classes só com o `@author`.
 - **Leituras sem dado restrito:** consultas de listagem e de busca por id não leem a coluna `senha` (nem CPF e data de nascimento do recrutador). Só `buscarParaLogin` lê a senha.
 - **Log:** só o `RegistroDoServidorEmLog` escreve no log das requisições; o `Aplicacao` só escreve a mensagem de configuração inválida antes de subir.
 - **SQL:** sempre por `conexaoBanco.executar(sql) { PreparedStatement statement -> ... }` com parâmetros `?`; nunca concatene valor de usuário na query.
@@ -310,7 +356,7 @@ cd microsservicos/ms-usuarios
 - Respeite o [Princípio do Anonimato](#princípio-do-anonimato-restrição-obrigatória) em toda feature.
 - Nunca exponha senha em saída, JSON ou log.
 - Não altere o schema, o contrato da API nem as dependências dos `build.gradle` dos MS ou do `package.json` sem perguntar.
-- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway nem Docker sem pedido explícito.
+- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway nem Docker sem pedido explícito. A única comunicação HTTP autorizada é a dos dois MS Spring entre si.
 - Não quebre a separação de camadas (ex.: SQL fora de `dao`, regra de negócio no controller, `fetch` fora de `ts/api/`).
 - **Use dados fictícios.** Em scripts de carga e testes, nunca use CPFs, e-mails ou nomes reais. O mesmo vale para exemplos na documentação e para cadastros feitos em conferência manual, que devem ser apagados ao final.
 - **Nunca faça commit de credenciais.** Senhas de banco, chaves de API e arquivos `.env` ficam fora do repositório: leia de variável de ambiente e não escreva o valor em código, teste, script ou documentação. Os `.gitignore` da raiz do projeto, do `frontend/` e de cada MS ignoram `.env`.

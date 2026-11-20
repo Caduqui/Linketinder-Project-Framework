@@ -1,13 +1,41 @@
 type Microsservico = "usuarios" | "competencias" | "vagas" | "curtidas";
 
-const URLS_BASE: Record<Microsservico, string> = {
+type MetodoHttp = "GET" | "POST" | "DELETE";
+
+const MODO_SPRING = import.meta.env.MODE === "spring";
+
+const URLS_MICRONAUT: Record<Microsservico, string> = {
     usuarios: import.meta.env.VITE_URL_USUARIOS ?? "http://localhost:8081",
     competencias: import.meta.env.VITE_URL_COMPETENCIAS ?? "http://localhost:8082",
     vagas: import.meta.env.VITE_URL_VAGAS ?? "http://localhost:8083",
     curtidas: import.meta.env.VITE_URL_CURTIDAS ?? "http://localhost:8084"
 };
 
-type MetodoHttp = "GET" | "POST" | "DELETE";
+const URL_SPRING_NUCLEO = import.meta.env.VITE_SPRING_NUCLEO_URL ?? "http://localhost:8086";
+
+const URLS_SPRING: Record<Microsservico, string> = {
+    usuarios: URL_SPRING_NUCLEO,
+    competencias: import.meta.env.VITE_SPRING_COMPETENCIAS_URL ?? "http://localhost:8087",
+    vagas: URL_SPRING_NUCLEO,
+    curtidas: URL_SPRING_NUCLEO
+};
+
+const NOMES_MICRONAUT: Record<Microsservico, string> = {
+    usuarios: "serviço de usuários",
+    competencias: "serviço de competências",
+    vagas: "serviço de vagas",
+    curtidas: "serviço de curtidas"
+};
+
+const NOMES_SPRING: Record<Microsservico, string> = {
+    usuarios: "serviço núcleo",
+    competencias: "serviço de competências",
+    vagas: "serviço núcleo",
+    curtidas: "serviço núcleo"
+};
+
+const URLS_BASE = MODO_SPRING ? URLS_SPRING : URLS_MICRONAUT;
+const NOMES_DOS_SERVICOS = MODO_SPRING ? NOMES_SPRING : NOMES_MICRONAUT;
 
 export class ErroApi extends Error {
     readonly status: number;
@@ -30,7 +58,7 @@ async function requisitar<T>(servico: Microsservico, metodo: MetodoHttp, caminho
             body: possuiCorpo ? JSON.stringify(corpo) : undefined
         });
     } catch {
-        throw new ErroApi(0, "Não foi possível conectar ao servidor. Verifique se o backend está no ar.");
+        throw new ErroApi(0, `Não foi possível conectar ao ${NOMES_DOS_SERVICOS[servico]}. Verifique se ele está no ar.`);
     }
 
     const dados = await lerJson(resposta);
