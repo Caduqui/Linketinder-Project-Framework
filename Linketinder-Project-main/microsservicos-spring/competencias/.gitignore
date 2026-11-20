@@ -1,0 +1,11 @@
+.gradle/
+build/
+out/
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+
+### Credenciais ###
+.env
+.env.*
