@@ -1,0 +1,29 @@
+server:
+  port: ${LINKETINDER_SPRING_NUCLEO_PORTA:8086}
+
+spring:
+  application:
+    name: ms-spring-nucleo
+  main:
+    banner-mode: off
+  datasource:
+    url: "${LINKETINDER_BANCO_URL:jdbc:postgresql://localhost:5432/linketinder}"
+    username: ${LINKETINDER_BANCO_USUARIO:postgres}
+    password: ${LINKETINDER_BANCO_SENHA}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  web:
+    resources:
+      add-mappings: false
+
+linketinder:
+  frontend-origem: "${LINKETINDER_FRONTEND_ORIGEM:http://localhost:5173}"
+  competencias:
+    url: "${LINKETINDER_SPRING_COMPETENCIAS_URL:http://localhost:8087}"
+
+logging:
+  level:
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
+    org.springframework.web.servlet.PageNotFound: "OFF"
