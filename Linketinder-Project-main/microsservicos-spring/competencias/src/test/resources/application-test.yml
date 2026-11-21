@@ -1,0 +1,20 @@
+# Sobe o contexto sem banco: o Hibernate não abre conexão e as consultas JPQL são conferidas na partida.
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://localhost:1/sem-banco"
+    password: sem-banco
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        boot:
+          allow_jdbc_metadata_access: false
+
+linketinder:
+  nucleo:
+    url: "http://localhost:1"

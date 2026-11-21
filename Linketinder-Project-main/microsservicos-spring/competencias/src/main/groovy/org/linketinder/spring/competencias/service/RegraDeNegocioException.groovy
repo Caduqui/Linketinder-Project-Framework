@@ -1,0 +1,13 @@
+package org.linketinder.spring.competencias.service
+
+/**
+ *
+ * @author Guilherme Lima Conte
+ */
+
+class RegraDeNegocioException extends RuntimeException {
+
+    RegraDeNegocioException(String mensagem) {
+        super(mensagem)
+    }
+}
