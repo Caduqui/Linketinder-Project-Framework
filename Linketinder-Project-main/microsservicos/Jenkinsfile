@@ -1,0 +1,91 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'MICROSSERVICO',
+            choices: ['todos', 'ms-usuarios', 'ms-competencias', 'ms-vagas', 'ms-curtidas'],
+            description: 'Microsserviço cujos testes unitários serão executados'
+        )
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        IMAGEM_JDK = 'eclipse-temurin:25-jdk'
+        PASTA_MICROSSERVICOS = 'Linketinder-Project-main/microsservicos'
+        CANAL_SLACK = '#testes_unitarios'
+        GRADLE_USER_HOME = "${WORKSPACE}/.gradle-home"
+    }
+
+    stages {
+        stage('MS Usuários') {
+            when { expression { selecionado('ms-usuarios') } }
+            steps { script { testarMicrosservico('ms-usuarios') } }
+        }
+        stage('MS Competências') {
+            when { expression { selecionado('ms-competencias') } }
+            steps { script { testarMicrosservico('ms-competencias') } }
+        }
+        stage('MS Vagas') {
+            when { expression { selecionado('ms-vagas') } }
+            steps { script { testarMicrosservico('ms-vagas') } }
+        }
+        stage('MS Curtidas') {
+            when { expression { selecionado('ms-curtidas') } }
+            steps { script { testarMicrosservico('ms-curtidas') } }
+        }
+    }
+}
+
+boolean selecionado(String microsservico) {
+    return params.MICROSSERVICO == 'todos' || params.MICROSSERVICO == microsservico
+}
+
+void testarMicrosservico(String microsservico) {
+    String pasta = "${env.PASTA_MICROSSERVICOS}/${microsservico}"
+    String dataHora = sh(returnStdout: true, script: "TZ=America/Sao_Paulo date '+%d/%m/%Y %H:%M:%S'").trim()
+    long inicio = System.currentTimeMillis()
+    int status = 0
+
+    docker.image(env.IMAGEM_JDK).inside('-e HOME=/tmp') {
+        dir(pasta) {
+            status = sh(returnStatus: true, script: 'sh ./gradlew cleanTest test --no-daemon')
+        }
+    }
+
+    long segundos = (System.currentTimeMillis() - inicio).intdiv(1000)
+    def resultado = junit(testResults: "${pasta}/build/test-results/test/*.xml", allowEmptyResults: true)
+
+    String situacao
+    String cor
+    if (status == 0) {
+        situacao = ':white_check_mark: Todos os testes passaram'
+        cor = 'good'
+    } else if (resultado.failCount > 0) {
+        situacao = ':x: Há testes com falha'
+        cor = 'danger'
+    } else {
+        situacao = ':warning: Erro ao executar a suíte (build ou compilação)'
+        cor = 'danger'
+    }
+
+    String relatorio = """*Testes unitários: ${microsservico}*
+${situacao}
+Data e hora: ${dataHora}
+Tempo de execução: ${segundos} s
+Testes: ${resultado.totalCount} | Falhas: ${resultado.failCount} | Ignorados: ${resultado.skipCount}
+Build: <${env.BUILD_URL}|${env.JOB_NAME} #${env.BUILD_NUMBER}>"""
+
+    echo relatorio
+    slackSend(channel: env.CANAL_SLACK, color: cor, message: relatorio)
+
+    if (status != 0 && resultado.failCount == 0) {
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+            error("A suíte do ${microsservico} não executou (código ${status})")
+        }
+    }
+}

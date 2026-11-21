@@ -20,6 +20,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Sincronização da documentação do microsserviço com o estado atual do código e do repositório, incluindo `AGENTS.md`, `docs/specs/microservico/spec.md` e `docs/specs/microservico/plano.md` (revisão de 2026-10-13).
 
 ### Adicionado
+- Pipeline de testes unitários no Jenkins (`microsservicos/Jenkinsfile`): roda a
+  suíte de cada MS num container com JDK 25, escolhendo todos ou um MS pelo
+  parâmetro `MICROSSERVICO`, publica o relatório JUnit e envia ao canal
+  `#testes_unitarios` do Slack o nome do MS, a data e hora, o tempo de execução,
+  o número de testes e o de falhas.
 - Banco isolado do MS Competências Spring (`database/LinketinderCompetencias.sql`):
   competências com nome único sem diferenciar maiúsculas e ligações com
   candidatos e vagas guardando só o id, com a mesma carga inicial do banco
@@ -185,6 +190,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (spec `microservico`, tarefa 8).
 
 ### Corrigido
+- `CorsSpec` dos quatro MS falhava dentro de container: o servidor de teste
+  usava o `HOSTNAME` do Docker em vez de `localhost`, e o preflight de outra
+  origem respondia `405` em vez de `403`. O `application-test.yml` de cada MS
+  passou a fixar `micronaut.server.host: localhost`.
 - Os quatro microsserviços passam a mandar `Vary: Origin` em toda resposta,
   e não só quando a requisição traz `Origin` (spec `backend-micronaut`, revisão AP-01).
 - O MS Curtidas anuncia só `POST` no CORS, o único método que usa
