@@ -73,7 +73,7 @@ microsservicos/
         model/
       src/main/resources/application.yml, logback.xml
       src/test/groovy/org/linketinder/<ms>/   specs Spock; DadosFicticios concentra os dados de teste
-      src/test/resources/application-test.yml datasource desligado e porta aleatória
+      src/test/resources/application-test.yml datasource desligado, servidor em localhost e porta aleatória
 microsservicos-spring/                    desafio Spring: duas aplicações Spring Boot independentes (build, wrapper e .gitignore próprios)
   nucleo/ (8086)  competencias/ (8087)
     src/main/groovy/org/linketinder/spring/<ms>/
@@ -331,6 +331,16 @@ cd microsservicos/ms-usuarios
 - Cada MS Spring tem a própria suíte, que roda sem banco: `cd microsservicos-spring/nucleo` (ou `competencias`) e `./gradlew test`. Os services usam `Mock` dos repositórios do Spring Data e da interface do outro MS (`integracao/`); os controllers são chamados pelo MockMvc (`ClienteDeTeste`), com o `TratadorDeErros` da aplicação; os clientes HTTP são testados com o `MockRestServiceServer`. O `AplicacaoSpec` sobe a aplicação inteira no perfil `test`, com o Hibernate impedido de abrir conexão: mapeamento JPA ou consulta JPQL errada derruba o contexto. O SQL nativo (`ON CONFLICT` e o match) depende de conferência manual com o PostgreSQL.
 - O frontend não tem testes unitários e não precisa ter (dispensado pelo desafio); valide com `npx tsc --noEmit` e manualmente no navegador.
 - Toda mudança de comportamento no backend deve vir com spec nova ou ajustada, e a suíte deve passar antes de considerar a tarefa concluída.
+
+### Pipeline no Jenkins
+
+`microsservicos/Jenkinsfile` roda as suítes dos quatro MS (ou de um só, pelo parâmetro `MICROSSERVICO`). Para cada MS, o Jenkins sobe um container `eclipse-temurin:25-jdk`, executa `sh ./gradlew cleanTest test` na pasta do MS, publica o relatório JUnit de `build/test-results/test/` e envia ao canal `#testes_unitarios` do Slack um resumo com nome do MS, data e hora, tempo de execução, número de testes e de falhas. Falha de teste deixa o build `UNSTABLE`; erro de build ou compilação marca o estágio como `FAILURE`, e os outros MS continuam rodando.
+
+- **No Jenkins:** job do tipo *Pipeline* com *Pipeline script from SCM*, apontando para este repositório e com *Script Path* `microsservicos/Jenkinsfile`. Plugins: Git, JUnit, Docker Pipeline e Slack Notification. O usuário `jenkins` precisa estar no grupo `docker`.
+- **Slack:** o token do bot fica numa credencial *Secret text* do Jenkins, configurada em *Manage Jenkins → System → Slack*. Nunca no `Jenkinsfile`.
+- O `gradlew` dos MS está no git sem bit de execução; por isso o pipeline chama `sh ./gradlew`.
+- O `application-test.yml` fixa `micronaut.server.host: localhost`. Sem isso o servidor de teste usa a variável `HOSTNAME`, que o Docker preenche com o ID do container, e o `CorsSpec` recebe `405` em vez de `403` no preflight de outra origem, porque a recusa vem da proteção do Micronaut para servidor em `localhost`.
+- Os MS Spring (`microsservicos-spring/`) ainda não estão no pipeline.
 
 ## Convenções
 
