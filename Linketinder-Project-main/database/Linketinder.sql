@@ -312,7 +312,7 @@ WHERE c.id = cc.id_candidato
   AND cc.id_competencia = comp.id
   AND comp.id = vc.id_competencia
   AND vc.id_vaga = v.id
-  AND v.id_empresa = e.id
+  AND v.id_empresa = e.id;
 
 -- curtidas
 
