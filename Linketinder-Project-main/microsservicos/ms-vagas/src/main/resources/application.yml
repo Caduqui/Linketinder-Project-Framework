@@ -20,3 +20,11 @@ datasources:
     username: ${LINKETINDER_BANCO_USUARIO:postgres}
     password: ${LINKETINDER_BANCO_SENHA}
     driver-class-name: org.postgresql.Driver
+kafka:
+  bootstrap:
+    servers: ${LINKETINDER_KAFKA_SERVIDORES:`localhost:9092`}
+  producers:
+    default:
+      max.block.ms: 3000
+      request.timeout.ms: 3000
+      delivery.timeout.ms: 5000

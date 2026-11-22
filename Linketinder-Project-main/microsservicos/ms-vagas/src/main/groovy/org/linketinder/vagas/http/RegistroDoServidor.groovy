@@ -10,4 +10,6 @@ interface RegistroDoServidor {
     void registrarRequisicao(String metodo, String rota, int status)
 
     void registrarFalhaDeBanco(String codigoDoErro)
+
+    void registrarFalhaDePublicacao(Integer idVaga, String tipoDaFalha)
 }

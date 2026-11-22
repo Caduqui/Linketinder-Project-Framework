@@ -1,6 +1,7 @@
 package org.linketinder.vagas.service
 
 import org.linketinder.vagas.DadosFicticios
+import org.linketinder.vagas.mensageria.PublicadorDeVagas
 import org.linketinder.vagas.model.Competencia
 import org.linketinder.vagas.model.Vaga
 import org.linketinder.vagas.repositorio.CompetenciaRepositorio
@@ -22,7 +23,9 @@ class VagaServiceSpec extends Specification {
     Transacao transacao = Mock() {
         executar(_) >> { Closure bloco -> bloco() }
     }
-    VagaService service = new VagaService(vagaRepositorio, competenciaRepositorio, empresaRepositorio, transacao)
+    PublicadorDeVagas publicadorDeVagas = Mock()
+    VagaService service = new VagaService(vagaRepositorio, competenciaRepositorio, empresaRepositorio, transacao,
+            publicadorDeVagas)
 
     def setup() {
         empresaRepositorio.existe(3) >> true
@@ -108,5 +111,56 @@ class VagaServiceSpec extends Specification {
 
         then:
         1 * vagaRepositorio.excluir(10)
+    }
+
+    def "publica a vaga gravada, relida do banco, depois de cadastrar"() {
+        given:
+        vagaRepositorio.inserir(_) >> { Vaga v -> v.id = 10; v }
+        competenciaRepositorio.buscarPorNomeIgnorandoCaixa(_) >> new Competencia(id: 1, nome: "Java")
+
+        when:
+        Vaga cadastrada = service.cadastrar(DadosFicticios.vaga(), 3)
+
+        then:
+        1 * publicadorDeVagas.publicarVagaCriada({ Vaga v -> v.id == 10 && v.competencias == ["Java"] })
+        cadastrada.id == 10
+    }
+
+    def "cadastro recusado não publica nada: #motivo"() {
+        given:
+        empresaRepositorio.existe(99) >> false
+
+        when:
+        service.cadastrar(dados, idEmpresa)
+
+        then:
+        thrown(RegraDeNegocioException)
+        0 * publicadorDeVagas._
+
+        where:
+        motivo                | dados                              | idEmpresa
+        "empresa inexistente" | DadosFicticios.vaga()              | 99
+        "nome vazio"          | DadosFicticios.vaga(nome: "  ")    | 3
+    }
+
+    def "falha durante a gravação não publica nada"() {
+        given:
+        vagaRepositorio.inserir(_) >> { throw new IllegalStateException("falha simulada") }
+
+        when:
+        service.cadastrar(DadosFicticios.vaga(), 3)
+
+        then:
+        thrown(IllegalStateException)
+        0 * publicadorDeVagas._
+    }
+
+    def "atualizar e excluir vaga não publicam nada"() {
+        when:
+        service.atualizar(10, DadosFicticios.vaga(competencias: []))
+        service.excluir(10)
+
+        then:
+        0 * publicadorDeVagas._
     }
 }

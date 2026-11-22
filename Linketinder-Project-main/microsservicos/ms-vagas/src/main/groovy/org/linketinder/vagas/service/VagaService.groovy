@@ -1,6 +1,7 @@
 package org.linketinder.vagas.service
 
 import jakarta.inject.Singleton
+import org.linketinder.vagas.mensageria.PublicadorDeVagas
 import org.linketinder.vagas.model.Competencia
 import org.linketinder.vagas.model.Vaga
 import org.linketinder.vagas.repositorio.CompetenciaRepositorio
@@ -20,13 +21,15 @@ class VagaService {
     private final CompetenciaRepositorio competenciaRepositorio
     private final EmpresaRepositorio empresaRepositorio
     private final Transacao transacao
+    private final PublicadorDeVagas publicadorDeVagas
 
     VagaService(VagaRepositorio vagaRepositorio, CompetenciaRepositorio competenciaRepositorio,
-                EmpresaRepositorio empresaRepositorio, Transacao transacao) {
+                EmpresaRepositorio empresaRepositorio, Transacao transacao, PublicadorDeVagas publicadorDeVagas) {
         this.vagaRepositorio = vagaRepositorio
         this.competenciaRepositorio = competenciaRepositorio
         this.empresaRepositorio = empresaRepositorio
         this.transacao = transacao
+        this.publicadorDeVagas = publicadorDeVagas
     }
 
     List<Vaga> listar() {
@@ -59,7 +62,9 @@ class VagaService {
             vincularCompetencias(vaga.id, vaga.competencias)
             return vaga.id
         }
-        return buscar(id)
+        Vaga cadastrada = buscar(id)
+        publicadorDeVagas.publicarVagaCriada(cadastrada)
+        return cadastrada
     }
 
     Vaga atualizar(Integer id, Map<String, Object> dados) {
