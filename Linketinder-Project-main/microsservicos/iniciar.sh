@@ -3,7 +3,7 @@
 set -u
 cd "$(dirname "$0")"
 
-MICROSSERVICOS=(ms-usuarios ms-competencias ms-vagas ms-curtidas)
+MICROSSERVICOS=(ms-usuarios ms-competencias ms-vagas ms-curtidas ms-emails)
 
 if [ -z "${LINKETINDER_BANCO_SENHA:-}" ] && [ -f .env ]; then
     set -a
@@ -32,5 +32,5 @@ for ms in "${MICROSSERVICOS[@]}"; do
     (cd "$ms" && sh ./gradlew run --no-daemon 2>&1 | sed -u "s/^/[$ms] /") &
 done
 
-echo "Microsserviços iniciando (portas 8081 a 8084). Ctrl+C para encerrar."
+echo "Microsserviços iniciando (portas 8081 a 8085). Ctrl+C para encerrar."
 wait
