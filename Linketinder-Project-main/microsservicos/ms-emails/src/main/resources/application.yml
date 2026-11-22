@@ -1,0 +1,24 @@
+micronaut:
+  application:
+    name: ms-emails
+  server:
+    port: 8085
+datasources:
+  default:
+    url: ${LINKETINDER_BANCO_URL:`jdbc:postgresql://localhost:5432/linketinder`}
+    username: ${LINKETINDER_BANCO_USUARIO:postgres}
+    password: ${LINKETINDER_BANCO_SENHA}
+    driver-class-name: org.postgresql.Driver
+kafka:
+  bootstrap:
+    servers: ${LINKETINDER_KAFKA_SERVIDORES:`localhost:9092`}
+javamail:
+  properties:
+    mail.smtp.host: ${LINKETINDER_SMTP_HOST:localhost}
+    mail.smtp.port: ${LINKETINDER_SMTP_PORTA:1025}
+    mail.smtp.connectiontimeout: 5000
+    mail.smtp.timeout: 5000
+    mail.smtp.writetimeout: 5000
+linketinder:
+  email:
+    remetente: ${LINKETINDER_EMAIL_REMETENTE:`nao-responda@linketinder.example.com`}

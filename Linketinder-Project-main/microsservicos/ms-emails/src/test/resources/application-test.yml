@@ -1,0 +1,9 @@
+micronaut:
+  server:
+    host: localhost
+    port: -1
+datasources:
+  default:
+    enabled: false
+kafka:
+  enabled: false
