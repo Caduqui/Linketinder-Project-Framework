@@ -142,6 +142,8 @@ Cada microsserviço é uma aplicação à parte, com build Gradle e código pró
 
 Quando um microsserviço precisa de um dado de outro agregado (por exemplo, o MS Curtidas saber de quem é a vaga), ele consulta direto no banco.
 
+Depois veio um quinto microsserviço Micronaut, o **MS E-mails** (porta `8085`), que não tem rotas e recebe as vagas novas do MS Vagas pelo Kafka. Ele está na seção [Microsserviço de e-mails com Kafka](#microsserviço-de-e-mails-com-kafka), no fim deste arquivo.
+
 ## Recursos utilizados
 
 - Micronaut Platform `5.2.2`, com o plugin Gradle `io.micronaut.application` `5.0.2`
@@ -395,3 +397,74 @@ cd microsservicos-spring/nucleo        # ou competencias
 ```
 
 Os services são testados com `Mock` dos repositórios e do cliente HTTP do outro MS, e os controllers pelo `MockMvc`, com o mesmo tratador de erros da aplicação. Os clientes HTTP são testados com o `MockRestServiceServer`. O `AplicacaoSpec` sobe a aplicação inteira sem banco (perfil `test`, com o Hibernate impedido de abrir conexão): se um mapeamento JPA ou uma consulta JPQL estiver errada, o contexto não sobe. O SQL nativo e o comportamento contra o PostgreSQL dependem de conferência manual.
+
+# Microsserviço de e-mails com Kafka
+
+Desafio Kafka: os outros microsserviços falam com o frontend por API REST, e este rompe esse padrão. O **MS E-mails** (`microsservicos/ms-emails`, porta `8085`) é uma aplicação Micronaut à parte, sem tela e sem rotas, que recebe o trabalho por **mensageria com Apache Kafka**. Quando uma empresa cadastra uma vaga, cada candidato recebe um e-mail avisando que há uma vaga nova.
+
+```
+frontend --POST /vagas--> MS Vagas --grava--> PostgreSQL
+                             |
+                             +--publica--> Kafka, tópico "vagas-criadas"
+                                                 |
+                                   MS E-mails <--+  (grupo "ms-emails")
+                                       |  lê os e-mails de "candidatos" no PostgreSQL
+                                       +--SMTP--> Mailpit (um e-mail por candidato)
+```
+
+1. O frontend envia o `POST /vagas` ao MS Vagas, que grava a vaga e as competências dela.
+2. Depois de gravar, o MS Vagas publica no tópico `vagas-criadas` uma mensagem JSON, com chave igual ao `id` da vaga:
+
+   ```json
+   {"id": 12, "nome": "Vaga Exemplo", "descricao": "Vaga inventada", "competencias": ["Java", "SQL"],
+    "estado": "MS", "cidade": "Campo Grande", "dataHoraCriacao": "2026-11-21T14:05:30.123-04:00"}
+   ```
+
+   A mensagem não leva nada da empresa, porque antes do match o candidato não pode saber de quem é a vaga (Princípio do Anonimato). Se o Kafka estiver fora do ar, a vaga é gravada do mesmo jeito, o `POST /vagas` responde `201` em até uns 3 segundos e a falha fica só no log.
+3. O MS E-mails consome a mensagem, lê do banco os e-mails de todos os candidatos e envia um e-mail para cada um, com um destinatário só. O e-mail tem o assunto `Nova vaga no Linketinder: <nome da vaga>`, um texto padrão e o nome, a descrição, as competências, o local e a data e hora da vaga. Se o MS E-mails estiver fora do ar, a mensagem espera no tópico e é consumida quando ele voltar.
+
+## Recursos utilizados
+
+- `micronaut-kafka` 6.2.0 (`kafka-clients` 4.3.1): `@KafkaClient` no MS Vagas e `@KafkaListener` no MS E-mails
+- `micronaut-email-javamail` 3.2.0 com o Jakarta Mail do Eclipse Angus, para o envio por SMTP
+- Kafka 4.2.0 em modo KRaft (sem Zookeeper) e Mailpit v1.28.0, que recebe os e-mails e mostra numa caixa de entrada web sem entregá-los a ninguém, os dois pelo `microsservicos/docker-compose.yml`
+
+## Como executar
+
+1. Suba o Kafka e o Mailpit, a partir de `microsservicos/` (exige Docker com o plugin `docker compose`):
+
+   ```bash
+   docker compose up -d
+   ```
+
+   O Kafka fica em `localhost:9092`, o SMTP do Mailpit em `localhost:1025` e a caixa de entrada em `http://localhost:8025`. As portas só aceitam conexões da própria máquina.
+2. Suba o MS Vagas e o MS E-mails como os outros microsserviços (janela própria do IntelliJ ou `LINKETINDER_BANCO_SENHA=<sua-senha> ./gradlew run` na pasta de cada um). O `microsservicos/iniciar.sh` sobe os cinco microsserviços Micronaut de uma vez.
+3. Cadastre uma vaga pelo site (ou pelo `curl` do `POST /vagas`) e abra `http://localhost:8025`: chega um e-mail por candidato.
+
+Para ver a mensagem que o MS Vagas publicou:
+
+```bash
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+  --topic vagas-criadas --from-beginning --property print.key=true
+```
+
+| Variável | Padrão | Para que serve |
+| --- | --- | --- |
+| `LINKETINDER_KAFKA_SERVIDORES` | `localhost:9092` | Endereço do Kafka (MS Vagas e MS E-mails) |
+| `LINKETINDER_SMTP_HOST` | `localhost` | Servidor SMTP do MS E-mails |
+| `LINKETINDER_SMTP_PORTA` | `1025` | Porta do SMTP |
+| `LINKETINDER_EMAIL_REMETENTE` | `nao-responda@linketinder.example.com` | Remetente dos e-mails |
+| `LINKETINDER_BANCO_SENHA` e as outras do banco | como nos outros microsserviços | O MS E-mails lê a tabela `candidatos` |
+
+> **Atenção:** a carga inicial do banco tem e-mails `@gmail.com`, que podem ser de pessoas reais. Com o SMTP padrão, os e-mails ficam no Mailpit e nada sai da máquina. Não aponte o SMTP para um provedor de verdade sem trocar esses endereços.
+
+O log do MS E-mails mostra só o `id` da vaga e quantos e-mails foram enviados e quantos falharam (`Vaga 12 notificada: 7 e-mails enviados, 0 falhas`), nunca os endereços.
+
+## Testes
+
+```bash
+cd microsservicos/ms-emails     # ou ms-vagas
+./gradlew test
+```
+
+Os testes rodam sem Kafka, sem SMTP e sem banco: o Kafka fica desligado no `application-test.yml`, e o publicador, o consumidor, o texto do e-mail, a contagem e o envio são testados com mocks das interfaces. A ida e volta pelo Kafka e a entrega no Mailpit são conferidas à mão com o `docker-compose` no ar.

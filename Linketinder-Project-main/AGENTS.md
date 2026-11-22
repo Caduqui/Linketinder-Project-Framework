@@ -6,7 +6,7 @@ Guia para agentes de IA que trabalham neste repositório. Leia inteiro antes de 
 
 Sempre que houver dúvida, ambiguidade ou uma decisão que não esteja escrita aqui (regra de negócio, mudança de schema, nova dependência, contrato da API, o que fazer com uma pendência listada abaixo), **pare e pergunte ao autor antes de decidir sozinho**. Explique o que encontrou e quais são as opções. Não "resolva" silenciosamente uma inconsistência entre este documento e o código.
 
-## Status atual do repositório (2026-11-20)
+## Status atual do repositório (2026-11-21)
 
 O backend foi reescrito com o **Micronaut Framework** na feature `backend-micronaut` (spec, plano e revisão em `docs/specs/backend-micronaut/`). Ele é formado por **quatro microsserviços** independentes em `microsservicos/`. O CLI, a API de servlets no Tomcat e o antigo `microservico-cadastro/` foram removidos, junto com o build Gradle da raiz e a pasta `lib/`.
 
@@ -16,13 +16,15 @@ As features anteriores (microsserviço de cadastro e recrutador) têm spec, plan
 
 Depois veio o **desafio Spring**, **sem spec**, no branch `feature/spring`: dois microsserviços Spring Boot em `microsservicos-spring/`, o **Núcleo** (candidato, empresa, vaga, recrutador, login, curtidas e match, porta 8086, banco `linketinder`) e o **Competências** (porta 8087, banco isolado `linketinder_competencias`, criado por `database/LinketinderCompetencias.sql`), com JPA e Hibernate e **chamadas HTTP entre os dois**. É um desafio separado do Micronaut: o site usa os MS Spring só no modo `npm run dev:spring` e continua no Micronaut com `npm run dev`. O desafio foi escrito sobre outra versão do MS Competências, e as rotas de competências ainda não batem com o frontend deste repositório (ver [Microsserviços Spring](#microsserviços-spring-desafio-spring)).
 
+Depois veio o **desafio Kafka**, **sem spec**, no branch `feature/kafka`: um **quinto MS Micronaut**, o **MS E-mails** (`microsservicos/ms-emails`, porta 8085), sem rotas de negócio. A cada vaga cadastrada, o MS Vagas publica uma mensagem no tópico Kafka `vagas-criadas`, e o MS E-mails a consome e envia um e-mail a cada candidato. O Kafka e o Mailpit (caixa de e-mails de teste) sobem por `microsservicos/docker-compose.yml`; os MS continuam fora do Docker (ver [Notificação de vagas](#notificação-de-vagas-por-e-mail-ms-vagas-e-ms-e-mails-com-kafka)).
+
 Qualquer mudança nova deve ser refletida aqui, na spec da feature (quando houver) e no `CHANGELOG.md` antes de fechar a tarefa.
 
 ## Visão geral
 
 Linketinder é um projeto de LinkedIn com Tinder em que **candidatos curtem vagas**, **empresas curtem candidatos** e, quando a curtida é recíproca, acontece um **match**. Até o match, as partes não sabem quem está do outro lado (ver [Princípio do Anonimato](#princípio-do-anonimato-restrição-obrigatória)).
 
-O repositório tem três partes: o backend, em quatro microsserviços (MS) Micronaut, o desafio Spring, em dois MS Spring Boot, e o frontend.
+O repositório tem três partes: o backend, em cinco microsserviços (MS) Micronaut (quatro com API REST e o MS E-mails, que só consome Kafka), o desafio Spring, em dois MS Spring Boot, e o frontend.
 
 | Parte | O que é | Porta |
 |---|---|---|
@@ -30,12 +32,15 @@ O repositório tem três partes: o backend, em quatro microsserviços (MS) Micro
 | MS Competências (`microsservicos/ms-competencias`) | Catálogo de competências e competências do candidato | `8082` |
 | MS Vagas (`microsservicos/ms-vagas`) | CRUD de vagas, com as competências de cada vaga | `8083` |
 | MS Curtidas (`microsservicos/ms-curtidas`) | Curtidas nos três sentidos e criação do match | `8084` |
+| MS E-mails (`microsservicos/ms-emails`) | Consome o tópico Kafka `vagas-criadas` e envia o e-mail de vaga nova a cada candidato; sem rotas de negócio | `8085` |
+| Infraestrutura (`microsservicos/docker-compose.yml`) | Kafka 4.2.0 em modo KRaft e Mailpit (SMTP de teste com caixa web), só para desenvolvimento | `9092`, `1025` e `8025` |
 | MS Núcleo Spring (`microsservicos-spring/nucleo`) | Desafio Spring: candidato, empresa, vaga, recrutador, login, curtidas e match, no banco `linketinder` | `8086` |
 | MS Competências Spring (`microsservicos-spring/competencias`) | Desafio Spring: competências do candidato e da vaga, no banco `linketinder_competencias` | `8087` |
 | Frontend (`frontend/`) | Páginas estáticas em TypeScript que chamam os MS Micronaut com `fetch` (ou os Spring, no modo `spring`) | `5173` (Vite) |
 
 - Cada MS é uma aplicação à parte: build Gradle, wrapper, `.gitignore` e código próprios (pacote `org.linketinder.<ms>`), aberta em uma janela própria do IntelliJ. **Nenhum MS importa código de outro**: o que é comum (formato de erro, CORS, log, conexão) é repetido em cada um.
-- Os quatro Micronaut gravam no **mesmo PostgreSQL** e **nenhum chama outro por HTTP**. Quando um MS precisa de dado de outro agregado (o MS Curtidas saber de quem é a vaga, o MS Vagas saber se a empresa existe), ele consulta direto no banco.
+- Os cinco Micronaut usam o **mesmo PostgreSQL** e **nenhum chama outro por HTTP**. Quando um MS precisa de dado de outro agregado (o MS Curtidas saber de quem é a vaga, o MS Vagas saber se a empresa existe, o MS E-mails saber os e-mails dos candidatos), ele consulta direto no banco.
+- A única comunicação entre MS Micronaut é por **Kafka**, num sentido só: o MS Vagas publica no tópico `vagas-criadas` e o MS E-mails consome, no grupo `ms-emails`.
 - Os dois MS Spring são a exceção: o Competências tem banco próprio e os dois **conversam por HTTP** (pacotes `org.linketinder.spring.nucleo` e `org.linketinder.spring.competencias`, sem importar código de outro MS).
 - O frontend é o único cliente. Ele não guarda dados próprios: o `sessionStorage` guarda apenas quem está logado (`tipo`, `id`, `nome` e, para o recrutador, `idEmpresa`).
 - Curtida e match existem só no MS Curtidas e no banco. Não há rota nem tela que liste matches.
@@ -45,6 +50,7 @@ O repositório tem três partes: o backend, em quatro microsserviços (MS) Micro
 - **Backend:** Micronaut Platform `5.2.2` (plugin Gradle `io.micronaut.application` `5.0.2`, servidor Netty), Groovy `5.0.8` sobre JDK 25, Gradle `9.6` (wrapper em cada MS).
 - **JVM do Gradle:** o plugin do Micronaut 5 exige que o **próprio Gradle** rode no JDK 25. Cada MS tem `gradle/gradle-daemon-jvm.properties` com `toolchainVersion=25`, então pelo terminal o Gradle acha o JDK 25 instalado sozinho. No IntelliJ, a *Gradle JVM* de cada janela precisa apontar para um JDK 25.
 - **Dependências de cada MS:** `micronaut-serde-jackson` (JSON), `micronaut-jdbc-hikari` (`DataSource`), `org.postgresql:postgresql:42.7.7`, `groovy`, `logback-classic`, `snakeyaml`; em teste, `micronaut-http-client` e `micronaut-test-spock` (pelo `testRuntime 'spock2'`).
+- **Mensageria e e-mail:** `io.micronaut.kafka:micronaut-kafka` 6.2.0 (`kafka-clients` 4.3.1) no MS Vagas e no MS E-mails; `io.micronaut.email:micronaut-email-javamail` 3.2.0 com `org.eclipse.angus:angus-mail` 2.0.5 (runtime) no MS E-mails. Versões pelo BOM do Micronaut, sem número no `build.gradle`. No `docker-compose.yml`: `apache/kafka:4.2.0` e `axllent/mailpit:v1.28.0`.
 - **Banco:** PostgreSQL via JDBC puro sobre o `DataSource` injetado, sem ORM, sem Micronaut Data e sem ferramenta de migração.
 - **Microsserviços Spring:** Spring Boot 4.1.3 (plugin `org.springframework.boot` e o BOM do Boot), que fixa Groovy 5.0.8, Spring Framework 7, Hibernate 7.4, Jackson 3 e Tomcat 11 embutido (`jakarta.*`); `spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa` (Spring Data JPA com Hibernate e o pool Hikari), o mesmo driver PostgreSQL 42.7.7; `RestClient` do Spring para um MS chamar o outro. Nos testes, `spring-test` (MockMvc e `MockRestServiceServer`) e `groovy-json`, sem `spock-spring`. O Groovy compila com `parameters = true`.
 - **Testes:** Spock 2.4 (`groovy-5.0`) com `@MicronautTest`, em JUnit Platform.
@@ -56,7 +62,10 @@ O repositório tem três partes: o backend, em quatro microsserviços (MS) Micro
 database/Linketinder.sql                  schema + carga inicial + consultas de exemplo
 database/LinketinderCompetencias.sql      banco isolado do MS Competências Spring + carga inicial
 microsservicos/
-  ms-usuarios/ (8081)  ms-competencias/ (8082)  ms-vagas/ (8083)  ms-curtidas/ (8084)
+  docker-compose.yml   Kafka (9092) e Mailpit (SMTP 1025, web 8025), presos a 127.0.0.1
+  iniciar.sh           sobe os cinco MS Micronaut juntos (lê a senha do banco de microsservicos/.env ou pergunta)
+  Jenkinsfile          pipeline dos testes unitários (ver Como testar)
+  ms-usuarios/ (8081)  ms-competencias/ (8082)  ms-vagas/ (8083)  ms-curtidas/ (8084)  ms-emails/ (8085)
     cada um com:
       build.gradle, settings.gradle, gradle.properties (micronautVersion), gradlew*, .gitignore
       gradle/wrapper/*, gradle/gradle-daemon-jvm.properties
@@ -71,9 +80,15 @@ microsservicos/
         dao/         implementações JDBC
         banco/       ConexaoBanco, TransacaoJdbc e TradutorDeErroDeBanco (onde são usados)
         model/
+        mensageria/  só no MS Vagas e no MS E-mails: PublicadorDeVagas (interface), PublicadorDeVagasKafka e
+                     ClienteKafkaDeVagas (@KafkaClient) no MS Vagas; ConsumidorDeVagasCriadas (@KafkaListener) no MS E-mails
+        email/       só no MS E-mails: EnviadorDeEmails (interface) e EnviadorDeEmailsSmtp (micronaut-email)
       src/main/resources/application.yml, logback.xml
       src/test/groovy/org/linketinder/<ms>/   specs Spock; DadosFicticios concentra os dados de teste
       src/test/resources/application-test.yml datasource desligado, servidor em localhost e porta aleatória
+                                              (e kafka.enabled: false no MS Vagas e no MS E-mails)
+    O MS E-mails tem só o que usa: em http/, ProcessadorDeErros, RespostaDeErro e RegistroDoServidor (sem controllers,
+    CORS nem filtro de requisições); em service/, LeitorDeMensagem, ModeloDeEmailDeVaga e NotificacaoService.
 microsservicos-spring/                    desafio Spring: duas aplicações Spring Boot independentes (build, wrapper e .gitignore próprios)
   nucleo/ (8086)  competencias/ (8087)
     src/main/groovy/org/linketinder/spring/<ms>/
@@ -111,7 +126,7 @@ frontend/
                      telaCandidatosDaVaga, telaVaga, telaRecrutadores
 ```
 
-Fluxo das camadas em cada MS: `http` (controller) → `service` → `repositorio` (interface) ← `dao` → `banco`. Nos MS Spring: `controller` → `service` → `repositorio` (Spring Data JPA, sem `dao`) e `service` → `integracao` → outro MS.
+Fluxo das camadas em cada MS: `http` (controller) → `service` → `repositorio` (interface) ← `dao` → `banco`. Com o Kafka: no MS Vagas, `service` → `mensageria` (interface `PublicadorDeVagas`) → Kafka; no MS E-mails, Kafka → `mensageria` (consumidor) → `service` → `repositorio` e `email` (interface `EnviadorDeEmails`). Nos MS Spring: `controller` → `service` → `repositorio` (Spring Data JPA, sem `dao`) e `service` → `integracao` → outro MS.
 
 ## Domínio
 
@@ -135,7 +150,10 @@ Detalhes que costumam confundir:
 
 ## Regras de negócio centrais
 
-### Contrato HTTP comum aos quatro MS
+### Contrato HTTP comum aos quatro MS com API REST
+
+O MS E-mails não tem rotas de negócio: qualquer caminho responde `404` no mesmo formato `{"erro": "Rota não encontrada"}`, e ele não tem CORS nem log de requisições.
+
 
 - Corpo de requisição e de resposta em JSON UTF-8. Todo erro tem o formato `{"erro": "<mensagem>"}`, em português.
 - Corpo vazio, JSON inválido ou que não é objeto → `400`; rota desconhecida → `404`; método não aceito em rota conhecida → `405` com `Allow`; falha de banco → `500` com `Erro ao acessar o banco de dados`, sem detalhe técnico.
@@ -165,6 +183,7 @@ Detalhes que costumam confundir:
 - A resposta traz `empresa: {id, nome}` (pendência conhecida). `GET /vagas?idEmpresa={id}` filtra pelas vagas de uma empresa.
 - O `PUT` substitui os dados e as competências da vaga pelas enviadas e **não muda a empresa dona** (o `idEmpresa` enviado é ignorado).
 - A exclusão apaga antes as competências, as curtidas nos três sentidos, os matches e os vínculos `recrutador_vaga` da vaga, numa transação.
+- Depois de gravar uma vaga nova, o `POST /vagas` a publica no Kafka (ver [Notificação de vagas](#notificação-de-vagas-por-e-mail-ms-vagas-e-ms-e-mails-com-kafka)). `PUT` e `DELETE` não publicam.
 
 ### Curtida (MS Curtidas)
 
@@ -201,6 +220,19 @@ Detalhes que costumam confundir:
 - **Não há sessão no servidor:** nem token, nem cookie. Os MS não sabem quem está chamando e nenhuma rota exige login. Quem está logado é só o que o frontend guarda no `sessionStorage` (`sessao.ts`) e reenvia como `idCandidato`/`idEmpresa`/`idRecrutador`; qualquer cliente pode enviar outro `id`.
 - No frontend, cada página declara no `<body>` quem pode vê-la (`data-perfil-exigido`, que aceita uma lista como `"empresa,recrutador"`, ou `data-somente-deslogado`) e `navegacao.ts` redireciona quem não se encaixa. É conveniência de navegação, não segurança.
 
+### Notificação de vagas por e-mail (MS Vagas e MS E-mails, com Kafka)
+
+Desafio Kafka, sem spec; o uso está no `README.md` ("Microsserviço de e-mails com Kafka").
+
+- **Publicação:** depois da transação do cadastro, o `VagaService` chama o `PublicadorDeVagas` com a vaga relida do banco. O `PublicadorDeVagasKafka` publica no tópico `vagas-criadas`, com chave igual ao `id` e um JSON com **só** `id`, `nome`, `descricao`, `competencias` (nomes do catálogo), `estado`, `cidade` e `dataHoraCriacao` (ISO-8601 com fuso, gerada pelo MS Vagas na publicação, porque a tabela `vagas` não tem essa coluna). Nada da empresa nem do recrutador.
+- **Kafka fora do ar não quebra o cadastro:** o producer desiste em até 3 segundos (`max.block.ms`, `request.timeout.ms` e `delivery.timeout.ms` no `application.yml`), o `POST /vagas` responde `201` como sempre e o log registra `Falha ao publicar a vaga <id> no Kafka (<tipo da exceção>)`. Aquela notificação se perde, sem nova tentativa.
+- **Consumo:** o `ConsumidorDeVagasCriadas` (`@KafkaListener`, grupo `ms-emails`, `offsetReset = EARLIEST`) recebe o valor como texto. O `LeitorDeMensagem` exige `id` inteiro e `nome`; mensagem vazia, JSON inválido, que não é objeto ou sem esses campos é descartada, e o log registra só o motivo fixo, nunca o conteúdo. `dataHoraCriacao` ausente ou fora do formato vira `Não informado`.
+- **Destinatários:** todos os candidatos (`CandidatoDAO`: `SELECT email FROM candidatos ORDER BY id`, só essa coluna). Um e-mail por candidato, com um único destinatário e sem cópia. Candidato cadastrado depois da vaga não recebe o e-mail dela.
+- **E-mail** (`ModeloDeEmailDeVaga`): assunto `Nova vaga no Linketinder: <nome>`; corpo em texto puro com saudação genérica (`Olá!`, sem o nome do candidato), texto padrão, nome, descrição, competências, `cidade/estado` e data e hora (`dd/MM/yyyy HH:mm`, no fuso em que o MS Vagas gerou), com `Não informado` no campo vazio. Sem índice de afinidade e sem nada da empresa.
+- **Falhas:** envio que falha para um candidato não impede os seguintes; ao fim, o log registra `Vaga <id> notificada: N e-mails enviados, M falhas`. Falha ao ler os candidatos não envia nada e registra só o `id` e o SQLState. Nada é reprocessado: o offset avança mesmo com falha, e mensagem entregue duas vezes pode gerar e-mails repetidos.
+- **MS E-mails fora do ar:** as mensagens ficam no tópico e são consumidas quando ele volta.
+- **SMTP:** `EnviadorDeEmailsSmtp` envia pelo `EmailSender` do `micronaut-email-javamail`, do remetente `linketinder.email.remetente`. O padrão aponta para o Mailpit local, que captura os e-mails sem entregá-los; o SMTP tem tempo limite de 5 segundos.
+
 ### Microsserviços Spring (desafio Spring)
 
 Desafio separado do Micronaut, sem spec; o contrato está no `README.md` ("Backend em microsserviços com Spring"). Decisões do autor: só a empresa cria vagas (o "recrutador" do caso de uso é a pessoa que opera a conta da empresa); o Núcleo tem tudo que o site usa; o formulário do candidato mantém CEP e formação; o Núcleo usa o banco `linketinder` e o Competências um banco próprio.
@@ -216,6 +248,7 @@ Desafio separado do Micronaut, sem spec; o contrato está no `README.md` ("Backe
 
 - Índice de afinidade (só no frontend, `calcularAfinidade` em `ts/afinidade.ts`): competências em comum ÷ total de competências da vaga, em porcentagem arredondada, ignorando maiúsculas/minúsculas e espaços das pontas; vaga sem competências dá 0%.
 - As filas de cards vêm em ordem decrescente de afinidade, com empate desfeito por sorteio (`ordenarPorAfinidade` embaralha antes de ordenar). Na fila de candidatos de uma vaga, quem tem 0% de afinidade não aparece; na fila de vagas do candidato, todas as vagas aparecem.
+- O MS E-mails, o Kafka e o Mailpit não afetam o site: com qualquer um deles fora do ar, o site funciona igual e só os e-mails deixam de sair.
 - Com um MS fora do ar, só as telas que dependem dele mostram "Não foi possível conectar ao serviço de ..." (no modo `spring`, "ao serviço núcleo" ou "ao serviço de competências").
 
 ## Princípio do Anonimato (restrição obrigatória)
@@ -243,6 +276,7 @@ Regras derivadas:
 5. Ao exibir candidatos para uma empresa ou para um recrutador, a tela mostra só `Candidato {id}`, formação, descrição e competências. Ao exibir vagas para um candidato não inclua a empresa. Ao exibir recrutadores para a empresa, nunca inclua CPF, data de nascimento ou senha.
 6. Se uma feature parecer exigir a exposição de um dado fora da tabela (ou se não estiver claro de qual lado é a tela), **pergunte antes de implementar**.
 7. O recrutador é interno à empresa: nenhuma saída, em nenhum momento, revela ao candidato que recrutadores existem ou qual deles o analisou. Curtida de recrutador vale como interesse da empresa, e é a empresa que aparece no match.
+8. O e-mail de vaga nova é uma saída para o candidato antes do match: traz só nome, descrição, competências e cidade/estado da vaga e a data e hora da publicação, nunca a empresa, o recrutador ou o endereço de outro candidato. A mensagem do tópico `vagas-criadas` também não leva nada da empresa, e os logs do MS Vagas e do MS E-mails só registram o `id` da vaga, contagens e tipos de falha.
 
 ### Pendências conhecidas (código ainda fora da regra)
 
@@ -256,6 +290,8 @@ Replicadas da API antiga na feature `backend-micronaut`, por decisão do autor, 
 - **Rotas de recrutador sem autenticação:** aceitam qualquer `idEmpresa` e `idRecrutador`. Quem souber o `id` de uma empresa cadastra, altera e remove recrutadores dela e lê nome, área, descrição e e-mail deles. A spec do recrutador (seção 4.3) autorizou e deixou a autenticação para feature própria.
 - **Senha em texto puro:** candidato, empresa e recrutador gravam a senha sem hash na coluna `senha`, e o `POST /login` compara em texto puro. Ela nunca é devolvida nem registrada em log, mas está legível no banco e trafega assim no corpo da requisição (HTTP, sem TLS, em desenvolvimento). Corrigir exige alterar as colunas, os cadastros e o login.
 - **Microsserviços Spring sem autenticação:** os dois MS Spring repetem as pendências acima (leituras abertas, CRUD, curtidas, recrutadores e senha em texto puro), e as rotas que só o Núcleo deveria chamar no MS Competências (`PUT`/`DELETE /vagas/{id}/competencias`, `DELETE /candidatos/{id}/competencias` e as leituras em lote) aceitam qualquer cliente. Quem souber um `id` troca ou apaga as competências de uma vaga ou de um candidato; o `HEAD /candidatos/{id}` do Núcleo revela só se um `id` existe. O Competências devolve do candidato e da vaga só o `id`, e os loggers do Spring e do Hibernate que escreveriam o caminho digitado ou o detalhe de uma violação de unicidade ficam desligados no `application.yml`.
+
+- **Tópico Kafka sem autenticação:** o Kafka do `docker-compose.yml` aceita qualquer cliente que alcance a porta 9092 (presa a `127.0.0.1`). Quem chegar lá lê o tópico `vagas-criadas`, que só tem dados da vaga, ou publica nele uma mensagem que o MS E-mails transforma em e-mail para todos os candidatos.
 
 Resolvidas pela remoção do backend antigo: o CLI imprimindo o nome da empresa na lista de vagas antes do match, o `Match.descrever()` incompleto e o `microservico-cadastro` sem login.
 
@@ -291,7 +327,17 @@ Cada MS roda a partir da própria pasta; no Windows use `gradlew.bat` (ou `./gra
   $env:LINKETINDER_BANCO_SENHA = "<sua-senha>"; .\gradlew.bat run
   ```
 
-  Portas padrão: MS Usuários `8081`, MS Competências `8082`, MS Vagas `8083`, MS Curtidas `8084`; troque com `MICRONAUT_SERVER_PORT`. A origem liberada no CORS vem de `LINKETINDER_FRONTEND_ORIGEM` (padrão `http://localhost:5173`). Rotas e exemplos estão no `README.md`.
+  Portas padrão: MS Usuários `8081`, MS Competências `8082`, MS Vagas `8083`, MS Curtidas `8084`, MS E-mails `8085`; troque com `MICRONAUT_SERVER_PORT`. O `microsservicos/iniciar.sh` sobe os cinco de uma vez (`bash iniciar.sh`; lê a senha de `microsservicos/.env` ou pergunta; Ctrl+C encerra todos). A origem liberada no CORS vem de `LINKETINDER_FRONTEND_ORIGEM` (padrão `http://localhost:5173`). Rotas e exemplos estão no `README.md`.
+- **Kafka e Mailpit:** exigem Docker com o plugin `docker compose` (o usuário precisa estar no grupo `docker`). Na pasta `microsservicos/`:
+
+  ```bash
+  docker compose up -d     # Kafka em localhost:9092 e Mailpit (SMTP 1025, caixa em http://localhost:8025)
+  docker compose ps
+  docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vagas-criadas --from-beginning --property print.key=true
+  docker compose down      # para e remove os containers
+  ```
+
+  O MS Vagas e o MS E-mails leem o Kafka de `LINKETINDER_KAFKA_SERVIDORES` (padrão `localhost:9092`). O MS E-mails lê o SMTP de `LINKETINDER_SMTP_HOST` (padrão `localhost`) e `LINKETINDER_SMTP_PORTA` (padrão `1025`) e o remetente de `LINKETINDER_EMAIL_REMETENTE` (padrão fictício `nao-responda@linketinder.example.com`). Sem o Kafka, os dois MS sobem e só registram avisos de conexão; sem o Mailpit, os envios falham e o log mostra a contagem. Não aponte o SMTP para um provedor real: a carga inicial tem e-mails `@gmail.com` (ver [Pendências conhecidas (dados)](#pendências-conhecidas-dados)).
 - **Microsserviços Spring:** exigem o PostgreSQL no ar com os bancos `linketinder` e `linketinder_competencias` e a variável `LINKETINDER_BANCO_SENHA`. Abra cada pasta de `microsservicos-spring/` numa janela do IntelliJ e rode a classe `Aplicacao` do pacote, ou, pelo terminal, a partir de cada pasta:
 
   ```bash
@@ -316,7 +362,7 @@ Cada MS roda a partir da própria pasta; no Windows use `gradlew.bat` (ou `./gra
 
 ## Como testar
 
-Cada MS tem a própria suíte, rodada na pasta dele. Mudou algo em um MS, rode a suíte dele; mudou algo repetido nos quatro (formato de erro, CORS, log), rode as quatro.
+Cada MS tem a própria suíte, rodada na pasta dele. Mudou algo em um MS, rode a suíte dele; mudou algo repetido entre eles (formato de erro, CORS, log), rode a de todos os que têm aquilo.
 
 ```bash
 cd microsservicos/ms-usuarios
@@ -328,13 +374,15 @@ cd microsservicos/ms-usuarios
 - **Mocks só de interfaces:** o byte-buddy usado hoje não gera classes para o JDK 25, então os testes simulam só interfaces. Por isso `RegistroDoServidor` é interface, com a implementação `RegistroDoServidorEmLog`.
 - Os dados de teste vêm de `DadosFicticios` de cada MS: e-mails em `example.com` e documentos com dígito verificador inválido.
 - Os DAOs e a transação dependem de conferência manual contra o PostgreSQL real (`curl` e consulta ao banco).
+- **Kafka e e-mail nos testes:** o `application-test.yml` do MS Vagas e do MS E-mails desliga o Kafka (`kafka.enabled: false`). O publicador, o consumidor, o leitor da mensagem, o texto do e-mail e o `EnviadorDeEmailsSmtp` são testados sem Kafka nem SMTP, com `Mock` das interfaces (`PublicadorDeVagas`, `ClienteKafkaDeVagas`, `CandidatoRepositorio`, `EnviadorDeEmails`, `EmailSender`, `RegistroDoServidor`); o consumidor é chamado direto, com o `LeitorDeMensagem` e o `NotificacaoService` reais. A ida e volta pelo Kafka e a entrega no Mailpit dependem de conferência manual com o `docker-compose` no ar.
+- Interface simulada por `Mock` não declara exceção checada: se o teste precisa lançar `SQLException` por um mock, o método da interface declara `throws SQLException` (como `CandidatoRepositorio.listarEmails()` no MS E-mails); senão o Spock a entrega embrulhada em `UndeclaredThrowableException`.
 - Cada MS Spring tem a própria suíte, que roda sem banco: `cd microsservicos-spring/nucleo` (ou `competencias`) e `./gradlew test`. Os services usam `Mock` dos repositórios do Spring Data e da interface do outro MS (`integracao/`); os controllers são chamados pelo MockMvc (`ClienteDeTeste`), com o `TratadorDeErros` da aplicação; os clientes HTTP são testados com o `MockRestServiceServer`. O `AplicacaoSpec` sobe a aplicação inteira no perfil `test`, com o Hibernate impedido de abrir conexão: mapeamento JPA ou consulta JPQL errada derruba o contexto. O SQL nativo (`ON CONFLICT` e o match) depende de conferência manual com o PostgreSQL.
 - O frontend não tem testes unitários e não precisa ter (dispensado pelo desafio); valide com `npx tsc --noEmit` e manualmente no navegador.
 - Toda mudança de comportamento no backend deve vir com spec nova ou ajustada, e a suíte deve passar antes de considerar a tarefa concluída.
 
 ### Pipeline no Jenkins
 
-`microsservicos/Jenkinsfile` roda as suítes dos quatro MS (ou de um só, pelo parâmetro `MICROSSERVICO`). Para cada MS, o Jenkins sobe um container `eclipse-temurin:25-jdk`, executa `sh ./gradlew cleanTest test` na pasta do MS, publica o relatório JUnit de `build/test-results/test/` e envia ao canal `#testes_unitarios` do Slack um resumo com nome do MS, data e hora, tempo de execução, número de testes e de falhas. Falha de teste deixa o build `UNSTABLE`; erro de build ou compilação marca o estágio como `FAILURE`, e os outros MS continuam rodando.
+`microsservicos/Jenkinsfile` roda as suítes dos cinco MS Micronaut (ou de um só, pelo parâmetro `MICROSSERVICO`). Para cada MS, o Jenkins sobe um container `eclipse-temurin:25-jdk`, executa `sh ./gradlew cleanTest test` na pasta do MS, publica o relatório JUnit de `build/test-results/test/` e envia ao canal `#testes_unitarios` do Slack um resumo com nome do MS, data e hora, tempo de execução, número de testes e de falhas. Falha de teste deixa o build `UNSTABLE`; erro de build ou compilação marca o estágio como `FAILURE`, e os outros MS continuam rodando.
 
 - **No Jenkins:** job do tipo *Pipeline* com *Pipeline script from SCM*, apontando para este repositório e com *Script Path* `microsservicos/Jenkinsfile`. Plugins: Git, JUnit, Docker Pipeline e Slack Notification. O usuário `jenkins` precisa estar no grupo `docker`.
 - **Slack:** o token do bot fica numa credencial *Secret text* do Jenkins, configurada em *Manage Jenkins → System → Slack*. Nunca no `Jenkinsfile`.
@@ -351,11 +399,14 @@ cd microsservicos/ms-usuarios
   - `service`: concentra as regras e lança `RegraDeNegocioException`, `RecursoNaoEncontradoException` ou `CadastroRepetidoException`;
   - `repositorio`: interfaces; `dao`: só persiste e implementa uma interface de `repositorio`;
   - `banco`: `ConexaoBanco` abre conexões pelo `DataSource` injetado; `TransacaoJdbc` faz a transação por thread.
+  - `mensageria`: só o que fala com o Kafka. O `service` depende de uma interface (`PublicadorDeVagas`), e a implementação com `@KafkaClient` captura a falha do Kafka e só a registra; o `@KafkaListener` não tem regra, só lê o texto, repassa ao `service` e registra o descarte;
+  - `email`: interface `EnviadorDeEmails` e a implementação com o `EmailSender` do `micronaut-email`.
 - **Micronaut:** beans com `@Singleton`, dependências por construtor apontando para interfaces; controllers com `@ExecuteOn(TaskExecutors.BLOCKING)`, porque o JDBC bloqueia e não pode rodar no event loop do Netty. Exceção nova de regra ganha um `Tratador*` em `http/`.
-- **Microsserviços independentes:** nenhum MS importa código de outro nem chama outro por HTTP (exceto os dois MS Spring, que conversam por HTTP). O que é comum é repetido em cada um; ao mudar algo repetido, mude nos quatro.
+- **Valores padrão com `:` no `application.yml`:** vão entre crases (`` ${LINKETINDER_KAFKA_SERVIDORES:`localhost:9092`} ``). Sem elas, o Micronaut lê cada `:` como uma alternativa e o valor vira só `9092`.
+- **Microsserviços independentes:** nenhum MS importa código de outro nem chama outro por HTTP (exceto os dois MS Spring, que conversam por HTTP). O MS Vagas e o MS E-mails só se falam pelo tópico `vagas-criadas`, e o formato da mensagem é contrato entre os dois: mudou um lado, mude o outro. O que é comum é repetido em cada um; ao mudar algo repetido, mude em todos os que o têm.
 - **Microsserviços Spring:** as convenções dos Micronaut, com estas trocas: `@RestController` com `@RequestBody Map<String, Object> corpo` e `@PathVariable("id") Integer`; regras em beans `@Service`, com `@Transactional` nas operações com mais de uma escrita (no lugar de `Transacao`); persistência por interfaces do Spring Data JPA em `repositorio/`, com nomes em português e a consulta explícita em `@Query` (JPQL; SQL nativo só para `ON CONFLICT` e o match), sem pasta `dao`; o outro MS é acessado por uma interface em `integracao/`, implementada com `RestClient`, que transforma recusa (`400`) em `DadosInvalidosException` e qualquer outra falha em `ServicoIndisponivelException` (`503`). Erros traduzidos em `http/TratadorDeErros` (`@RestControllerAdvice`). Javadoc das classes só com o `@author`.
 - **Leituras sem dado restrito:** consultas de listagem e de busca por id não leem a coluna `senha` (nem CPF e data de nascimento do recrutador). Só `buscarParaLogin` lê a senha.
-- **Log:** só o `RegistroDoServidorEmLog` escreve no log das requisições; o `Aplicacao` só escreve a mensagem de configuração inválida antes de subir.
+- **Log:** só o `RegistroDoServidorEmLog` escreve no log das requisições e das notificações; o `Aplicacao` só escreve a mensagem de configuração inválida antes de subir. Nos MS com Kafka, o `logback.xml` deixa `org.apache.kafka` em `WARN`, para o cliente não despejar a configuração a cada subida.
 - **SQL:** sempre por `conexaoBanco.executar(sql) { PreparedStatement statement -> ... }` com parâmetros `?`; nunca concatene valor de usuário na query.
 - **Estilo Groovy:** tipos explícitos em vez de `def`; sem modificador de visibilidade em classes e métodos públicos; dependências como `private final`; constantes `static final` em `MAIUSCULAS`; indentação de 4 espaços; cabeçalho `@author Guilherme Lima Conte` nas classes.
 - **Frontend:** uma tela por módulo em `ts/telas/`; o acesso aos MS fica em `ts/api/` (`http.ts` tem a URL base de cada MS, monta a requisição e lança `ErroApi`; `api.ts` tem uma função por endpoint, usando o cliente do MS daquela rota) e nenhum outro módulo chama `fetch`; tipos em `modelos.ts`, DOM e mensagens em `dom.ts`, sessão em `sessao.ts`, caminhos entre páginas em `navegacao.ts`. Funções exportadas com nomes em português. `main.ts` é o único ponto de entrada e só liga o que existe na página aberta.
@@ -366,7 +417,8 @@ cd microsservicos/ms-usuarios
 - Respeite o [Princípio do Anonimato](#princípio-do-anonimato-restrição-obrigatória) em toda feature.
 - Nunca exponha senha em saída, JSON ou log.
 - Não altere o schema, o contrato da API nem as dependências dos `build.gradle` dos MS ou do `package.json` sem perguntar.
-- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway nem Docker sem pedido explícito. A única comunicação HTTP autorizada é a dos dois MS Spring entre si.
+- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway, tópico Kafka novo nem Docker sem pedido explícito. A única comunicação HTTP autorizada é a dos dois MS Spring entre si; a única mensageria, o tópico `vagas-criadas` (MS Vagas → MS E-mails); o único Docker, o `microsservicos/docker-compose.yml` só com a infraestrutura (Kafka e Mailpit), sem os MS.
+- Não aponte o SMTP do MS E-mails para um provedor real sem pedido explícito: os e-mails da carga inicial podem ser de pessoas reais.
 - Não quebre a separação de camadas (ex.: SQL fora de `dao`, regra de negócio no controller, `fetch` fora de `ts/api/`).
 - **Use dados fictícios.** Em scripts de carga e testes, nunca use CPFs, e-mails ou nomes reais. O mesmo vale para exemplos na documentação e para cadastros feitos em conferência manual, que devem ser apagados ao final.
 - **Nunca faça commit de credenciais.** Senhas de banco, chaves de API e arquivos `.env` ficam fora do repositório: leia de variável de ambiente e não escreva o valor em código, teste, script ou documentação. Os `.gitignore` da raiz do projeto, do `frontend/` e de cada MS ignoram `.env`.
@@ -375,6 +427,6 @@ cd microsservicos/ms-usuarios
 
 ### Pendências conhecidas (dados)
 
-- A carga inicial (`database/Linketinder.sql`) usa e-mails em domínio real (`@gmail.com`), que podem pertencer a alguém. Não amplie, não use como modelo e pergunte antes de corrigir.
+- A carga inicial (`database/Linketinder.sql`) usa e-mails em domínio real (`@gmail.com`), que podem pertencer a alguém. Não amplie, não use como modelo e pergunte antes de corrigir. Desde o desafio Kafka, o MS E-mails manda o e-mail de vaga nova também para esses endereços: com o SMTP padrão eles ficam no Mailpit local e nada sai da máquina, mas um SMTP real os entregaria.
 
 Resolvidas pela remoção do backend antigo: a senha de banco fixa em `ProvedorPostgreSQL`/`ProvedorMySQL` (os MS leem de variável de ambiente) e os e-mails `@gmail.com` das specs de `src/test`. O `.gitignore` da raiz do projeto e o do `frontend/` passaram a ignorar `.env`.
