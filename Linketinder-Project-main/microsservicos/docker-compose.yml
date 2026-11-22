@@ -1,6 +1,38 @@
 name: linketinder
 
+x-banco: &banco
+  LINKETINDER_BANCO_URL: jdbc:postgresql://postgres:5432/linketinder
+  LINKETINDER_BANCO_USUARIO: postgres
+  LINKETINDER_BANCO_SENHA: ${LINKETINDER_BANCO_SENHA:?defina LINKETINDER_BANCO_SENHA em microsservicos/.env}
+  MICRONAUT_SERVER_HOST: 0.0.0.0
+  TZ: ${LINKETINDER_FUSO_HORARIO:-America/Sao_Paulo}
+
+x-api: &api
+  <<: *banco
+  LINKETINDER_FRONTEND_ORIGEM: ${LINKETINDER_FRONTEND_ORIGEM:-http://localhost:5173}
+
+x-depende-do-banco: &depende-do-banco
+  postgres:
+    condition: service_healthy
+
 services:
+  postgres:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: linketinder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LINKETINDER_BANCO_SENHA:?defina LINKETINDER_BANCO_SENHA em microsservicos/.env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - dados-do-banco:/var/lib/postgresql/data
+      - ../database/Linketinder.sql:/docker-entrypoint-initdb.d/linketinder.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "linketinder"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   kafka:
     image: apache/kafka:4.2.0
     ports:
@@ -8,10 +40,11 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: EXTERNO://:9092,INTERNO://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNO://localhost:9092,INTERNO://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNO
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNO:PLAINTEXT,INTERNO:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -19,9 +52,73 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
 
   mailpit:
     image: axllent/mailpit:v1.28.0
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
+
+  ms-usuarios:
+    build: ./ms-usuarios
+    image: linketinder/ms-usuarios:1.0
+    environment: *api
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on: *depende-do-banco
+
+  ms-competencias:
+    build: ./ms-competencias
+    image: linketinder/ms-competencias:1.0
+    environment: *api
+    ports:
+      - "127.0.0.1:8082:8082"
+    depends_on: *depende-do-banco
+
+  ms-vagas:
+    build: ./ms-vagas
+    image: linketinder/ms-vagas:1.0
+    environment:
+      <<: *api
+      LINKETINDER_KAFKA_SERVIDORES: kafka:29092
+    ports:
+      - "127.0.0.1:8083:8083"
+    depends_on:
+      <<: *depende-do-banco
+      kafka:
+        condition: service_healthy
+
+  ms-curtidas:
+    build: ./ms-curtidas
+    image: linketinder/ms-curtidas:1.0
+    environment: *api
+    ports:
+      - "127.0.0.1:8084:8084"
+    depends_on: *depende-do-banco
+
+  ms-emails:
+    build: ./ms-emails
+    image: linketinder/ms-emails:1.0
+    environment:
+      <<: *banco
+      LINKETINDER_KAFKA_SERVIDORES: kafka:29092
+      LINKETINDER_SMTP_HOST: mailpit
+      LINKETINDER_SMTP_PORTA: 1025
+      LINKETINDER_EMAIL_REMETENTE: ${LINKETINDER_EMAIL_REMETENTE:-nao-responda@linketinder.example.com}
+    ports:
+      - "127.0.0.1:8085:8085"
+    depends_on:
+      <<: *depende-do-banco
+      kafka:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+volumes:
+  dados-do-banco:

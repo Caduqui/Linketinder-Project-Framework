@@ -2,7 +2,7 @@ autor: Guilherme Lima Conte
 
 **Como executar:**
 
-O backend são quatro microsserviços Micronaut, em `microsservicos/`, e o site fica em `frontend/`. O passo a passo está na seção [Backend em microsserviços Micronaut](#backend-em-microsserviços-micronaut), no fim deste arquivo.
+O backend são cinco microsserviços Micronaut, em `microsservicos/`, e o site fica em `frontend/`. O jeito mais simples de subir o backend é pelo Docker, na seção [Execução com Docker](#execução-com-docker), no fim deste arquivo; sem Docker, o passo a passo está em [Backend em microsserviços Micronaut](#backend-em-microsserviços-micronaut).
 
 As seções a seguir contam a evolução do projeto, mas o CLI e a API de servlets que várias delas descrevem foram substituídos pelos microsserviços.
 
@@ -431,11 +431,13 @@ frontend --POST /vagas--> MS Vagas --grava--> PostgreSQL
 
 ## Como executar
 
-1. Suba o Kafka e o Mailpit, a partir de `microsservicos/` (exige Docker com o plugin `docker compose`):
+1. Suba o Kafka e o Mailpit, a partir de `microsservicos/` (exige Docker com o plugin `docker compose` e o `microsservicos/.env` com a senha do banco):
 
    ```bash
-   docker compose up -d
+   docker compose up -d kafka mailpit
    ```
+
+   Para subir também o banco e os microsserviços em containers, veja [Execução com Docker](#execução-com-docker).
 
    O Kafka fica em `localhost:9092`, o SMTP do Mailpit em `localhost:1025` e a caixa de entrada em `http://localhost:8025`. As portas só aceitam conexões da própria máquina.
 2. Suba o MS Vagas e o MS E-mails como os outros microsserviços (janela própria do IntelliJ ou `LINKETINDER_BANCO_SENHA=<sua-senha> ./gradlew run` na pasta de cada um). O `microsservicos/iniciar.sh` sobe os cinco microsserviços Micronaut de uma vez.
@@ -468,3 +470,75 @@ cd microsservicos/ms-emails     # ou ms-vagas
 ```
 
 Os testes rodam sem Kafka, sem SMTP e sem banco: o Kafka fica desligado no `application-test.yml`, e o publicador, o consumidor, o texto do e-mail, a contagem e o envio são testados com mocks das interfaces. A ida e volta pelo Kafka e a entrega no Mailpit são conferidas à mão com o `docker-compose` no ar.
+
+# Execução com Docker
+
+Desafio Docker: os cinco microsserviços Micronaut e as dependências deles rodam em containers, sem nenhuma funcionalidade nova. Antes, cada microsserviço subia numa janela do IntelliJ (ou pelo `iniciar.sh`) e o banco era o PostgreSQL instalado na máquina. Agora um único `docker compose up` constrói as imagens e sobe a aplicação inteira.
+
+```
+                 host (127.0.0.1)                     rede do compose
+frontend (Vite, 5173) --HTTP--> 8081 ---> ms-usuarios     --+
+                                8082 ---> ms-competencias --+
+                                8083 ---> ms-vagas -------- +--> postgres:5432  (host 5433)
+                                8084 ---> ms-curtidas ------+
+                                8085 ---> ms-emails --------+
+                                            ms-vagas  --publica--> kafka:29092  (host 9092)
+                                            ms-emails <--consome-- kafka:29092
+                                            ms-emails --SMTP-----> mailpit:1025 (caixa em 8025)
+```
+
+| Serviço | Imagem | Porta no host | Porta no container |
+| --- | --- | --- | --- |
+| `ms-usuarios` | `linketinder/ms-usuarios:1.0` (construída do `Dockerfile` da pasta) | `8081` | `8081` |
+| `ms-competencias` | `linketinder/ms-competencias:1.0` | `8082` | `8082` |
+| `ms-vagas` | `linketinder/ms-vagas:1.0` | `8083` | `8083` |
+| `ms-curtidas` | `linketinder/ms-curtidas:1.0` | `8084` | `8084` |
+| `ms-emails` | `linketinder/ms-emails:1.0` | `8085` | `8085` |
+| `postgres` | `postgres:17.6` | `5433` | `5432` |
+| `kafka` | `apache/kafka:4.2.0` | `9092` | `9092` (host) e `29092` (containers) |
+| `mailpit` | `axllent/mailpit:v1.28.0` | `1025` e `8025` | `1025` e `8025` |
+
+Todas as portas só aceitam conexões da própria máquina. O frontend não mudou: os microsserviços continuam nas portas que o `http.ts` já usa.
+
+## Recursos utilizados
+
+- Um `Dockerfile` em cada `microsservicos/ms-*`, em dois estágios: o Gradle compila com o JDK 25 (`eclipse-temurin:25-jdk`) e a imagem final leva só o JRE 25 (`eclipse-temurin:25-jre`) e a aplicação, rodando com um usuário sem privilégio.
+- `microsservicos/docker-compose.yml` com os oito serviços, a ordem de subida por `healthcheck` (os microsserviços esperam o banco, e os de vagas e de e-mails também o Kafka) e um volume para os dados do banco.
+- O banco é criado pelo próprio container do PostgreSQL, que roda o `database/Linketinder.sql` na primeira subida.
+
+## Como executar
+
+1. Instale o Docker com o plugin `docker compose` e coloque seu usuário no grupo `docker` (no Ubuntu: `sudo apt install docker-compose-v2` e `sudo usermod -aG docker $USER`, depois saia e entre de novo na sessão).
+2. Crie o arquivo `microsservicos/.env`, que não vai para o git, com a senha do banco do container:
+
+   ```
+   LINKETINDER_BANCO_SENHA=<sua-senha>
+   ```
+
+3. Na pasta `microsservicos/`, construa as imagens e suba tudo:
+
+   ```bash
+   docker compose up -d --build
+   docker compose ps          # postgres e kafka "healthy" e os cinco microsserviços "running"
+   ```
+
+   A primeira construção baixa o Gradle e as dependências e leva alguns minutos.
+
+   O `.env` aceita também `LINKETINDER_FUSO_HORARIO` (padrão `America/Sao_Paulo`), o fuso em que o MS Vagas gera a data e hora mostrada no e-mail de vaga nova, e `LINKETINDER_FRONTEND_ORIGEM` e `LINKETINDER_EMAIL_REMETENTE`, com os mesmos padrões de fora do Docker.
+4. Suba o frontend como sempre (`npm run dev` em `frontend/`) e abra `http://localhost:5173`. Os e-mails de vaga nova aparecem em `http://localhost:8025`.
+
+Outros comandos úteis:
+
+```bash
+docker compose logs -f ms-vagas ms-emails             # log de um ou mais serviços
+docker compose up -d --build ms-vagas                 # reconstrói e reinicia um microsserviço só
+docker compose down                                   # para tudo; os dados do banco ficam no volume
+docker compose down -v                                # para tudo e apaga o banco (a próxima subida roda o script de novo)
+docker image ls "linketinder/*"                       # as imagens geradas
+```
+
+O compose e o `iniciar.sh` usam as mesmas portas: rode um ou outro. O `psql` do host chega ao banco do container por `psql -h localhost -p 5433 -U postgres -d linketinder`.
+
+## Testes
+
+Os testes de cada microsserviço continuam rodando pelo Gradle e pelo Jenkins, sem Docker e sem banco; a construção das imagens não roda os testes. A subida pelo compose é conferida à mão: cadastrar uma vaga pelo site e ver os e-mails chegarem ao Mailpit.

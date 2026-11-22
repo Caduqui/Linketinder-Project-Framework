@@ -16,7 +16,9 @@ As features anteriores (microsserviço de cadastro e recrutador) têm spec, plan
 
 Depois veio o **desafio Spring**, **sem spec**, no branch `feature/spring`: dois microsserviços Spring Boot em `microsservicos-spring/`, o **Núcleo** (candidato, empresa, vaga, recrutador, login, curtidas e match, porta 8086, banco `linketinder`) e o **Competências** (porta 8087, banco isolado `linketinder_competencias`, criado por `database/LinketinderCompetencias.sql`), com JPA e Hibernate e **chamadas HTTP entre os dois**. É um desafio separado do Micronaut: o site usa os MS Spring só no modo `npm run dev:spring` e continua no Micronaut com `npm run dev`. O desafio foi escrito sobre outra versão do MS Competências, e as rotas de competências ainda não batem com o frontend deste repositório (ver [Microsserviços Spring](#microsserviços-spring-desafio-spring)).
 
-Depois veio o **desafio Kafka**, **sem spec**, no branch `feature/kafka`: um **quinto MS Micronaut**, o **MS E-mails** (`microsservicos/ms-emails`, porta 8085), sem rotas de negócio. A cada vaga cadastrada, o MS Vagas publica uma mensagem no tópico Kafka `vagas-criadas`, e o MS E-mails a consome e envia um e-mail a cada candidato. O Kafka e o Mailpit (caixa de e-mails de teste) sobem por `microsservicos/docker-compose.yml`; os MS continuam fora do Docker (ver [Notificação de vagas](#notificação-de-vagas-por-e-mail-ms-vagas-e-ms-e-mails-com-kafka)).
+Depois veio o **desafio Kafka**, **sem spec**, no branch `feature/kafka`: um **quinto MS Micronaut**, o **MS E-mails** (`microsservicos/ms-emails`, porta 8085), sem rotas de negócio. A cada vaga cadastrada, o MS Vagas publica uma mensagem no tópico Kafka `vagas-criadas`, e o MS E-mails a consome e envia um e-mail a cada candidato. O Kafka e o Mailpit (caixa de e-mails de teste) sobem por `microsservicos/docker-compose.yml` (ver [Notificação de vagas](#notificação-de-vagas-por-e-mail-ms-vagas-e-ms-e-mails-com-kafka)).
+
+Depois veio o **desafio Docker**, **sem spec**, no branch `feature/docker`: cada um dos cinco MS Micronaut ganhou um `Dockerfile` (imagem `linketinder/ms-<nome>:1.0`), e o `microsservicos/docker-compose.yml` passou a subir a aplicação inteira — PostgreSQL (criado por `database/Linketinder.sql` na primeira subida), Kafka, Mailpit e os cinco MS — com um `docker compose up -d --build`. Nenhuma regra de negócio mudou. O frontend continua no Vite, fora do Docker, e não mudou: os containers ficam nas mesmas portas do host (8081 a 8085). Os MS Spring ficaram fora do Docker (ver [Docker](#docker-desafio-docker)).
 
 Qualquer mudança nova deve ser refletida aqui, na spec da feature (quando houver) e no `CHANGELOG.md` antes de fechar a tarefa.
 
@@ -33,7 +35,7 @@ O repositório tem três partes: o backend, em cinco microsserviços (MS) Micron
 | MS Vagas (`microsservicos/ms-vagas`) | CRUD de vagas, com as competências de cada vaga | `8083` |
 | MS Curtidas (`microsservicos/ms-curtidas`) | Curtidas nos três sentidos e criação do match | `8084` |
 | MS E-mails (`microsservicos/ms-emails`) | Consome o tópico Kafka `vagas-criadas` e envia o e-mail de vaga nova a cada candidato; sem rotas de negócio | `8085` |
-| Infraestrutura (`microsservicos/docker-compose.yml`) | Kafka 4.2.0 em modo KRaft e Mailpit (SMTP de teste com caixa web), só para desenvolvimento | `9092`, `1025` e `8025` |
+| Docker (`microsservicos/docker-compose.yml`) | PostgreSQL 17.6, Kafka 4.2.0 em modo KRaft, Mailpit (SMTP de teste com caixa web) e as imagens dos cinco MS Micronaut, só para desenvolvimento | `5433` (Postgres no host), `9092`, `1025`, `8025` e `8081` a `8085` |
 | MS Núcleo Spring (`microsservicos-spring/nucleo`) | Desafio Spring: candidato, empresa, vaga, recrutador, login, curtidas e match, no banco `linketinder` | `8086` |
 | MS Competências Spring (`microsservicos-spring/competencias`) | Desafio Spring: competências do candidato e da vaga, no banco `linketinder_competencias` | `8087` |
 | Frontend (`frontend/`) | Páginas estáticas em TypeScript que chamam os MS Micronaut com `fetch` (ou os Spring, no modo `spring`) | `5173` (Vite) |
@@ -62,12 +64,14 @@ O repositório tem três partes: o backend, em cinco microsserviços (MS) Micron
 database/Linketinder.sql                  schema + carga inicial + consultas de exemplo
 database/LinketinderCompetencias.sql      banco isolado do MS Competências Spring + carga inicial
 microsservicos/
-  docker-compose.yml   Kafka (9092) e Mailpit (SMTP 1025, web 8025), presos a 127.0.0.1
+  docker-compose.yml   aplicação inteira: Postgres (host 5433), Kafka (9092), Mailpit (SMTP 1025, web 8025) e os cinco MS
+                       (8081 a 8085), tudo preso a 127.0.0.1; lê a senha do banco de microsservicos/.env
   iniciar.sh           sobe os cinco MS Micronaut juntos (lê a senha do banco de microsservicos/.env ou pergunta)
   Jenkinsfile          pipeline dos testes unitários (ver Como testar)
   ms-usuarios/ (8081)  ms-competencias/ (8082)  ms-vagas/ (8083)  ms-curtidas/ (8084)  ms-emails/ (8085)
     cada um com:
       build.gradle, settings.gradle, gradle.properties (micronautVersion), gradlew*, .gitignore
+      Dockerfile (build com JDK 25, imagem final só com JRE 25) e .dockerignore
       gradle/wrapper/*, gradle/gradle-daemon-jvm.properties
       src/main/groovy/org/linketinder/<ms>/
         Aplicacao            ponto de entrada; confere a senha do banco antes de subir
@@ -291,7 +295,7 @@ Replicadas da API antiga na feature `backend-micronaut`, por decisão do autor, 
 - **Senha em texto puro:** candidato, empresa e recrutador gravam a senha sem hash na coluna `senha`, e o `POST /login` compara em texto puro. Ela nunca é devolvida nem registrada em log, mas está legível no banco e trafega assim no corpo da requisição (HTTP, sem TLS, em desenvolvimento). Corrigir exige alterar as colunas, os cadastros e o login.
 - **Microsserviços Spring sem autenticação:** os dois MS Spring repetem as pendências acima (leituras abertas, CRUD, curtidas, recrutadores e senha em texto puro), e as rotas que só o Núcleo deveria chamar no MS Competências (`PUT`/`DELETE /vagas/{id}/competencias`, `DELETE /candidatos/{id}/competencias` e as leituras em lote) aceitam qualquer cliente. Quem souber um `id` troca ou apaga as competências de uma vaga ou de um candidato; o `HEAD /candidatos/{id}` do Núcleo revela só se um `id` existe. O Competências devolve do candidato e da vaga só o `id`, e os loggers do Spring e do Hibernate que escreveriam o caminho digitado ou o detalhe de uma violação de unicidade ficam desligados no `application.yml`.
 
-- **Tópico Kafka sem autenticação:** o Kafka do `docker-compose.yml` aceita qualquer cliente que alcance a porta 9092 (presa a `127.0.0.1`). Quem chegar lá lê o tópico `vagas-criadas`, que só tem dados da vaga, ou publica nele uma mensagem que o MS E-mails transforma em e-mail para todos os candidatos.
+- **Tópico Kafka sem autenticação:** o Kafka do `docker-compose.yml` aceita qualquer cliente que alcance a porta 9092 (presa a `127.0.0.1`) ou, de dentro da rede do compose, a 29092. Quem chegar lá lê o tópico `vagas-criadas`, que só tem dados da vaga, ou publica nele uma mensagem que o MS E-mails transforma em e-mail para todos os candidatos.
 
 Resolvidas pela remoção do backend antigo: o CLI imprimindo o nome da empresa na lista de vagas antes do match, o `Match.descrever()` incompleto e o `microservico-cadastro` sem login.
 
@@ -307,7 +311,7 @@ Resolvidas pela remoção do backend antigo: o CLI imprimindo o nome da empresa 
   ```
 
   Sem `psql` no PATH, abra o arquivo no pgAdmin ou no console SQL do IntelliJ e execute.
-- **Problema conhecido no script:** o último `SELECT` antes do bloco `-- curtidas` está sem `;`. Executado de uma vez, o `CREATE TABLE "curtida_candidato_vaga"` falha junto com ele e tudo que depende dessa tabela também. Até ser corrigido, execute o bloco de curtidas/matches separadamente. Pergunte antes de corrigir o arquivo.
+- **No Docker:** o container `postgres` roda o `database/Linketinder.sql` sozinho na primeira subida, com o volume `dados-do-banco` vazio, e para no primeiro erro do script. Mudou o script, recrie o volume (`docker compose down -v`, que apaga os dados). O `;` que faltava antes do bloco `-- curtidas` foi corrigido no desafio Docker, e o script roda inteiro de uma vez.
 - **SQL específico do PostgreSQL:** os DAOs usam `RETURNING` e `ON CONFLICT`. Só o PostgreSQL é suportado.
 - **Banco do MS Competências Spring:** `database/LinketinderCompetencias.sql` cria `competencias` (índice único em `LOWER(nome)`), `candidato_competencia` e `vaga_competencia` (sem FK para candidato e vaga) num banco à parte, com a mesma carga inicial de competências do `linketinder`. Também não é idempotente: `createdb -U postgres linketinder_competencias` e `psql -U postgres -d linketinder_competencias -f database/LinketinderCompetencias.sql`, uma vez. Os MS Spring usam a mesma `LINKETINDER_BANCO_SENHA` e conferem o schema na subida (`ddl-auto: validate`), sem criá-lo.
 - **Mudanças de schema:** não há migrações. Qualquer alteração precisa ser refletida no script do banco (`database/Linketinder.sql` ou `database/LinketinderCompetencias.sql`), nos DAOs ou nas entidades JPA de todos os MS que usam a tabela e no DER — **pergunte antes de alterar o schema**.
@@ -328,10 +332,10 @@ Cada MS roda a partir da própria pasta; no Windows use `gradlew.bat` (ou `./gra
   ```
 
   Portas padrão: MS Usuários `8081`, MS Competências `8082`, MS Vagas `8083`, MS Curtidas `8084`, MS E-mails `8085`; troque com `MICRONAUT_SERVER_PORT`. O `microsservicos/iniciar.sh` sobe os cinco de uma vez (`bash iniciar.sh`; lê a senha de `microsservicos/.env` ou pergunta; Ctrl+C encerra todos). A origem liberada no CORS vem de `LINKETINDER_FRONTEND_ORIGEM` (padrão `http://localhost:5173`). Rotas e exemplos estão no `README.md`.
-- **Kafka e Mailpit:** exigem Docker com o plugin `docker compose` (o usuário precisa estar no grupo `docker`). Na pasta `microsservicos/`:
+- **Kafka e Mailpit, com os MS fora do Docker:** exigem Docker com o plugin `docker compose` (o usuário precisa estar no grupo `docker`) e o `microsservicos/.env` com a senha do banco, que o compose sempre lê. Na pasta `microsservicos/`:
 
   ```bash
-  docker compose up -d     # Kafka em localhost:9092 e Mailpit (SMTP 1025, caixa em http://localhost:8025)
+  docker compose up -d kafka mailpit     # Kafka em localhost:9092 e Mailpit (SMTP 1025, caixa em http://localhost:8025)
   docker compose ps
   docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vagas-criadas --from-beginning --property print.key=true
   docker compose down      # para e remove os containers
@@ -359,6 +363,25 @@ Cada MS roda a partir da própria pasta; no Windows use `gradlew.bat` (ou `./gra
   No modo `spring` (`import.meta.env.MODE`), o `http.ts` manda usuários, vagas e curtidas para o Núcleo (`VITE_SPRING_NUCLEO_URL`, padrão `http://localhost:8086`) e competências para o MS Competências Spring (`VITE_SPRING_COMPETENCIAS_URL`, padrão `http://localhost:8087`).
 
   O fluxo começa em `index.html` (escolher candidato, empresa ou recrutador) e a sessão fica no `sessionStorage`: fechar a aba desloga.
+
+### Docker (desafio Docker)
+
+A forma de subir tudo de uma vez. Exige só o Docker com o plugin `docker compose` (o usuário no grupo `docker`) e o arquivo `microsservicos/.env`, fora do git, com `LINKETINDER_BANCO_SENHA=<senha>`: ela vira a senha do Postgres do container e a dos MS. Sem ela, o compose para com `defina LINKETINDER_BANCO_SENHA em microsservicos/.env`. Na pasta `microsservicos/`:
+
+```bash
+docker compose up -d --build     # constrói as cinco imagens e sobe tudo
+docker compose ps                # postgres e kafka ficam "healthy"; os MS sobem depois deles
+docker compose logs -f ms-vagas ms-emails
+docker compose down              # para e remove os containers; os dados do banco ficam no volume
+docker compose down -v           # idem, apagando o volume do banco (a próxima subida roda o script de novo)
+```
+
+- **Imagens:** cada `microsservicos/ms-*/Dockerfile` tem dois estágios. O primeiro (`eclipse-temurin:25-jdk`) roda `./gradlew installDist` e dá leitura a todos em `build/install` (`chmod -R a+rX`: o Gradle grava os jars com permissão `600`, e sem isso o usuário da imagem final não os lê e o MS cai com `NoClassDefFoundError: groovy/lang/GroovyObject`); o segundo (`eclipse-temurin:25-jre`) leva só `build/install/<ms>`, roda como o usuário sem privilégio `linketinder` e começa por `bin/<ms>`. Os testes não rodam no build da imagem (rodam pelo Gradle ou pelo Jenkins). O `.dockerignore` deixa fora `build/`, `.gradle`, `.idea` e `.env`.
+- **Rede:** os containers se acham pelo nome do serviço. Os MS usam `jdbc:postgresql://postgres:5432/linketinder`, o Kafka em `kafka:29092` (listener `INTERNO`, que não é publicado no host) e o SMTP em `mailpit:1025`. Do host, o Kafka continua em `localhost:9092` (listener `EXTERNO`), o Postgres do container em `localhost:5433` (a `5432` fica livre para um Postgres local) e cada MS na porta de sempre, tudo preso a `127.0.0.1`.
+- **Ordem:** os MS esperam o `postgres` ficar saudável (`pg_isready` por TCP, que só responde depois do script); o MS Vagas e o MS E-mails também esperam o `kafka` (`kafka-broker-api-versions.sh`). Os MS não têm `healthcheck` nem `restart`.
+- **Variáveis:** o compose fixa as de banco, Kafka e SMTP de cada MS e `MICRONAUT_SERVER_HOST=0.0.0.0`, para o Netty atender pela rede do container. O fuso dos MS vem de `TZ`, com padrão `America/Sao_Paulo` e trocável por `LINKETINDER_FUSO_HORARIO` no `.env` — sem isso o container usa UTC, e o horário do e-mail de vaga nova (gerado pelo MS Vagas) sai em UTC. `LINKETINDER_FRONTEND_ORIGEM` e `LINKETINDER_EMAIL_REMETENTE` também podem vir do `.env`; o padrão é o mesmo de fora do Docker.
+- **Frontend:** `npm run dev` em `frontend/`, como sempre, sem mudança no `http.ts`.
+- **Conflito de portas:** o compose inteiro e o `iniciar.sh` usam as portas 8081 a 8085; rode um ou outro. Os MS Spring não estão no compose.
 
 ## Como testar
 
@@ -389,6 +412,7 @@ cd microsservicos/ms-usuarios
 - O `gradlew` dos MS está no git sem bit de execução; por isso o pipeline chama `sh ./gradlew`.
 - O `application-test.yml` fixa `micronaut.server.host: localhost`. Sem isso o servidor de teste usa a variável `HOSTNAME`, que o Docker preenche com o ID do container, e o `CorsSpec` recebe `405` em vez de `403` no preflight de outra origem, porque a recusa vem da proteção do Micronaut para servidor em `localhost`.
 - Os MS Spring (`microsservicos-spring/`) ainda não estão no pipeline.
+- O pipeline não constrói as imagens Docker. A subida pelo `docker-compose.yml` depende de conferência manual.
 
 ## Convenções
 
@@ -417,7 +441,7 @@ cd microsservicos/ms-usuarios
 - Respeite o [Princípio do Anonimato](#princípio-do-anonimato-restrição-obrigatória) em toda feature.
 - Nunca exponha senha em saída, JSON ou log.
 - Não altere o schema, o contrato da API nem as dependências dos `build.gradle` dos MS ou do `package.json` sem perguntar.
-- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway, tópico Kafka novo nem Docker sem pedido explícito. A única comunicação HTTP autorizada é a dos dois MS Spring entre si; a única mensageria, o tópico `vagas-criadas` (MS Vagas → MS E-mails); o único Docker, o `microsservicos/docker-compose.yml` só com a infraestrutura (Kafka e Mailpit), sem os MS.
+- Não crie comunicação HTTP entre MS, código compartilhado entre eles, API gateway, tópico Kafka novo nem Docker sem pedido explícito. A única comunicação HTTP autorizada é a dos dois MS Spring entre si; a única mensageria, o tópico `vagas-criadas` (MS Vagas → MS E-mails); o único Docker, o `microsservicos/docker-compose.yml` com Postgres, Kafka, Mailpit e os cinco MS Micronaut (cada um com o próprio `Dockerfile`). Não ponha o frontend nem os MS Spring no Docker sem pedido explícito.
 - Não aponte o SMTP do MS E-mails para um provedor real sem pedido explícito: os e-mails da carga inicial podem ser de pessoas reais.
 - Não quebre a separação de camadas (ex.: SQL fora de `dao`, regra de negócio no controller, `fetch` fora de `ts/api/`).
 - **Use dados fictícios.** Em scripts de carga e testes, nunca use CPFs, e-mails ou nomes reais. O mesmo vale para exemplos na documentação e para cadastros feitos em conferência manual, que devem ser apagados ao final.

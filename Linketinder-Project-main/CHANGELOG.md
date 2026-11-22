@@ -7,6 +7,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Não lançado]
 
 ### Documentado
+- Desafio Docker no `AGENTS.md` e no `README.md`: como subir a aplicação inteira
+  pelo compose, as imagens, as portas e a rede entre os containers. A feature
+  entrou sem spec em `docs/specs/`.
 - Desafio Spring no `AGENTS.md` e no `README.md`: os dois MS, os bancos, a
   comunicação por HTTP entre eles, como subir, as rotas novas e o modo spring do
   frontend. A feature entrou sem spec em `docs/specs/`.
@@ -20,6 +23,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Sincronização da documentação do microsserviço com o estado atual do código e do repositório, incluindo `AGENTS.md`, `docs/specs/microservico/spec.md` e `docs/specs/microservico/plano.md` (revisão de 2026-10-13).
 
 ### Adicionado
+- `Dockerfile` e `.dockerignore` em cada um dos cinco MS Micronaut: build com
+  JDK 25 e imagem final só com o JRE 25, rodando sem privilégio (desafio Docker).
+- O `microsservicos/docker-compose.yml` sobe também o PostgreSQL (criado pelo
+  `database/Linketinder.sql` na primeira subida, no host em `5433`) e os cinco
+  MS, nas portas de sempre; os containers falam com o banco, o Kafka e o Mailpit
+  pela rede do compose (desafio Docker).
+- Os MS no compose usam o fuso `America/Sao_Paulo`, trocável por
+  `LINKETINDER_FUSO_HORARIO`, para o horário do e-mail de vaga nova não sair em
+  UTC (desafio Docker).
 - `microsservicos/docker-compose.yml` sobe o Kafka (KRaft, porta 9092) e o
   Mailpit (SMTP 1025, caixa web 8025) para desenvolvimento local
   (desafio Kafka).
@@ -176,6 +188,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   com o frontend (spec `microservico`, tarefa 7).
 
 ### Modificado
+- O Kafka do compose ganhou um segundo listener, `kafka:29092`, para os
+  containers; do host ele continua em `localhost:9092` (desafio Docker).
+- O compose passou a exigir `LINKETINDER_BANCO_SENHA` (no `microsservicos/.env`)
+  mesmo para subir só o Kafka e o Mailpit, agora com
+  `docker compose up -d kafka mailpit` (desafio Docker).
 - O `VagaService` do MS Vagas avisa um publicador de vagas depois de cadastrar
   uma vaga; atualizar e excluir não avisam
   (desafio Kafka).
@@ -218,6 +235,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (spec `microservico`, tarefa 8).
 
 ### Corrigido
+- O `database/Linketinder.sql` tinha um `;` faltando antes do bloco
+  `-- curtidas`, e as tabelas de curtida e de match não eram criadas quando o
+  script rodava de uma vez (desafio Docker).
 - `CorsSpec` dos quatro MS falhava dentro de container: o servidor de teste
   usava o `HOSTNAME` do Docker em vez de `localhost`, e o preflight de outra
   origem respondia `405` em vez de `403`. O `application-test.yml` de cada MS
