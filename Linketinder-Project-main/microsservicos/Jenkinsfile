@@ -4,7 +4,7 @@ pipeline {
     parameters {
         choice(
             name: 'MICROSSERVICO',
-            choices: ['todos', 'ms-usuarios', 'ms-competencias', 'ms-vagas', 'ms-curtidas'],
+            choices: ['todos', 'ms-usuarios', 'ms-competencias', 'ms-vagas', 'ms-curtidas', 'ms-emails'],
             description: 'Microsserviço cujos testes unitários serão executados'
         )
     }
@@ -37,6 +37,10 @@ pipeline {
         stage('MS Curtidas') {
             when { expression { selecionado('ms-curtidas') } }
             steps { script { testarMicrosservico('ms-curtidas') } }
+        }
+        stage('MS E-mails') {
+            when { expression { selecionado('ms-emails') } }
+            steps { script { testarMicrosservico('ms-emails') } }
         }
     }
 }

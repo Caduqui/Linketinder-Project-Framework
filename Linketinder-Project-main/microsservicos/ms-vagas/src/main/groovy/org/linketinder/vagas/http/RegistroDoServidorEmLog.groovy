@@ -23,4 +23,9 @@ class RegistroDoServidorEmLog implements RegistroDoServidor {
     void registrarFalhaDeBanco(String codigoDoErro) {
         LOG.error("Falha ao acessar o banco de dados (SQLState {})", codigoDoErro)
     }
+
+    @Override
+    void registrarFalhaDePublicacao(Integer idVaga, String tipoDaFalha) {
+        LOG.error("Falha ao publicar a vaga {} no Kafka ({})", idVaga, tipoDaFalha)
+    }
 }

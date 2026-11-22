@@ -20,6 +20,27 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Sincronização da documentação do microsserviço com o estado atual do código e do repositório, incluindo `AGENTS.md`, `docs/specs/microservico/spec.md` e `docs/specs/microservico/plano.md` (revisão de 2026-10-13).
 
 ### Adicionado
+- `microsservicos/docker-compose.yml` sobe o Kafka (KRaft, porta 9092) e o
+  Mailpit (SMTP 1025, caixa web 8025) para desenvolvimento local
+  (desafio Kafka).
+- O MS Vagas publica no tópico Kafka `vagas-criadas` cada vaga cadastrada (id,
+  nome, descrição, competências, estado, cidade e data e hora, sem dados da
+  empresa); com o Kafka fora do ar, o cadastro responde `201` e a falha vai para
+  o log (desafio Kafka).
+- Esqueleto do MS E-mails Micronaut (`microsservicos/ms-emails`, porta 8085),
+  sem rotas de negócio e exigindo a senha do banco para subir
+  (desafio Kafka).
+- O MS E-mails lê do banco os e-mails dos candidatos, e só essa coluna
+  (desafio Kafka).
+- O MS E-mails lê a mensagem de vaga criada e monta o e-mail com texto padrão e
+  os dados da vaga, sem dados da empresa
+  (desafio Kafka).
+- O MS E-mails envia o e-mail da vaga nova a cada candidato, um por
+  destinatário, continua quando um envio falha e registra no log só o id da vaga
+  e as contagens (desafio Kafka).
+- O MS E-mails consome o tópico `vagas-criadas` (grupo `ms-emails`) e envia os
+  e-mails por SMTP, por padrão para o Mailpit local; mensagem inválida é
+  descartada (desafio Kafka).
 - Pipeline de testes unitários no Jenkins (`microsservicos/Jenkinsfile`): roda a
   suíte de cada MS num container com JDK 25, escolhendo todos ou um MS pelo
   parâmetro `MICROSSERVICO`, publica o relatório JUnit e envia ao canal
@@ -155,6 +176,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   com o frontend (spec `microservico`, tarefa 7).
 
 ### Modificado
+- O `VagaService` do MS Vagas avisa um publicador de vagas depois de cadastrar
+  uma vaga; atualizar e excluir não avisam
+  (desafio Kafka).
+- `iniciar.sh` e o pipeline do Jenkins passam a incluir o MS E-mails
+  (desafio Kafka).
+- Documentação da notificação de vagas por e-mail com Kafka no `AGENTS.md` e
+  no `README.md` (desafio Kafka).
 - Mensagem de serviço fora do ar no frontend passa a nomear o serviço inteiro
   ("Não foi possível conectar ao serviço de usuários" ou "ao serviço núcleo",
   conforme o modo) (desafio Spring).

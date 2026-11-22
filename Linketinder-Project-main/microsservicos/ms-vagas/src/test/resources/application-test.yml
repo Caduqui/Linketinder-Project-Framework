@@ -10,3 +10,5 @@ micronaut:
 datasources:
   default:
     enabled: false
+kafka:
+  enabled: false

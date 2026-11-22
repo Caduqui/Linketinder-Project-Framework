@@ -15,6 +15,8 @@ import org.linketinder.vagas.banco.TransacaoJdbc
 import org.linketinder.vagas.dao.CompetenciaDAO
 import org.linketinder.vagas.dao.EmpresaDAO
 import org.linketinder.vagas.dao.VagaDAO
+import org.linketinder.vagas.mensageria.PublicadorDeVagas
+import org.linketinder.vagas.mensageria.PublicadorDeVagasKafka
 import org.linketinder.vagas.model.Competencia
 import org.linketinder.vagas.model.Vaga
 import org.linketinder.vagas.repositorio.CompetenciaRepositorio
@@ -59,6 +61,11 @@ class VagaControllerSpec extends Specification {
     @MockBean(EmpresaDAO)
     EmpresaRepositorio empresaRepositorioFalso() {
         return Mock(EmpresaRepositorio)
+    }
+
+    @MockBean(PublicadorDeVagasKafka)
+    PublicadorDeVagas publicadorDeVagasFalso() {
+        return Mock(PublicadorDeVagas)
     }
 
     @MockBean(TransacaoJdbc)
